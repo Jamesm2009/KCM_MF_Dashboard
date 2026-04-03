@@ -1,18 +1,29 @@
 """
-Fund Performance Dashboard — Full Build
+Fund Performance Dashboard
 RS Score: (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40)
+
+Fix: background thread for data loading to avoid web request timeouts.
+     3y history for range bar; performance from within 1y window.
 """
 
 from flask import Flask, render_template, jsonify
 import yfinance as yf
 import pandas as pd
-import numpy as np
-from datetime import datetime, date
+import threading
+from datetime import datetime, date, timedelta
 import json, os
 
 app = Flask(__name__)
-cache = {"data": None, "last_updated": "Never", "vix_signal": "grey",
-         "vix_value": None, "vix9d_value": None}
+
+cache = {
+    "data": [],
+    "last_updated": "Loading...",
+    "vix_signal": "grey",
+    "vix9d_value": "—",
+    "vix_value": "—",
+    "loading": True,
+}
+_lock = threading.Lock()
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -22,134 +33,101 @@ def load_funds():
         return json.load(f)
 
 
-def period_return(hist, days):
-    if len(hist) < 2:
+def period_return(closes, days):
+    """% change over last `days` calendar days using a DatetimeIndex Series."""
+    if len(closes) < 2:
         return None
-    latest_date = hist.index[-1]
-    target_date = latest_date - pd.Timedelta(days=days)
-    past = hist["Close"][hist.index <= target_date]
+    latest = closes.index[-1]
+    target = latest - pd.Timedelta(days=days)
+    past   = closes[closes.index <= target]
     if past.empty:
         return None
-    return (hist["Close"].iloc[-1] - past.iloc[-1]) / past.iloc[-1] * 100
+    return (closes.iloc[-1] - past.iloc[-1]) / past.iloc[-1] * 100
 
 
-def ytd_return(hist):
-    this_year = hist[hist.index.year == date.today().year]["Close"]
+def ytd_return(closes):
+    this_year = closes[closes.index.year == date.today().year]
     if this_year.empty:
         return None
     return (this_year.iloc[-1] - this_year.iloc[0]) / this_year.iloc[0] * 100
 
 
-def zscore_1yr(hist_1yr):
-    closes = hist_1yr["Close"].dropna()
-    if len(closes) < 20:
+def zscore_1yr(closes_1yr):
+    c = closes_1yr.dropna()
+    if len(c) < 20:
         return None
-    mean, std = closes.mean(), closes.std()
+    std = c.std()
     if std == 0:
         return None
-    return round((closes.iloc[-1] - mean) / std, 2)
+    return round((c.iloc[-1] - c.mean()) / std, 2)
 
 
-def trade_flag(hist):
-    """Green if last > 21d SMA, red if last < 21d SMA, grey if equal."""
-    closes = hist["Close"].dropna()
-    if len(closes) < 21:
+def sma_flag(closes, window):
+    """Green if last > SMA, red if last < SMA, grey if equal."""
+    c = closes.dropna()
+    if len(c) < window:
         return "grey"
-    sma = closes.tail(21).mean()
-    last = closes.iloc[-1]
-    if last > sma:
-        return "green"
-    elif last < sma:
-        return "red"
+    sma  = c.tail(window).mean()
+    last = c.iloc[-1]
+    if last > sma:   return "green"
+    if last < sma:   return "red"
     return "grey"
 
 
-def trend_flag(hist):
-    """Green if last > 63d SMA, red if last < 63d SMA, grey if equal."""
-    closes = hist["Close"].dropna()
-    if len(closes) < 63:
-        return "grey"
-    sma = closes.tail(63).mean()
-    last = closes.iloc[-1]
-    if last > sma:
-        return "green"
-    elif last < sma:
-        return "red"
-    return "grey"
-
-
-def make_sparkline(hist, days=170, w=90, h=28):
-    """Return inline SVG sparkline for the last `days` trading days."""
-    closes = hist["Close"].dropna().tail(days).values
-    if len(closes) < 2:
+def make_sparkline(closes, days=170, w=90, h=28):
+    c = closes.dropna().tail(days).values
+    if len(c) < 2:
         return ""
-    mn, mx = closes.min(), closes.max()
+    mn, mx = c.min(), c.max()
     if mn == mx:
         return ""
-    pts = []
-    n = len(closes) - 1
-    for i, v in enumerate(closes):
-        x = round(i / n * w, 1)
-        y = round((1 - (v - mn) / (mx - mn)) * (h - 2) + 1, 1)
-        pts.append(f"{x},{y}")
-    color = "#16a34a" if closes[-1] >= closes[0] else "#dc2626"
+    n   = len(c) - 1
+    pts = [f"{round(i/n*w,1)},{round((1-(v-mn)/(mx-mn))*(h-2)+1,1)}"
+           for i, v in enumerate(c)]
+    col = "#16a34a" if c[-1] >= c[0] else "#dc2626"
     return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
             f'xmlns="http://www.w3.org/2000/svg">'
-            f'<polyline points="{" ".join(pts)}" fill="none" stroke="{color}" '
+            f'<polyline points="{" ".join(pts)}" fill="none" stroke="{col}" '
             f'stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
             f'</svg>')
 
 
-def price_bar_data(hist):
-    """Return (low_3y, high_3y, last, pct_position) for 3-year range bar."""
-    closes = hist["Close"].dropna()
-    if len(closes) < 2:
+def price_bar_data(closes):
+    c = closes.dropna()
+    if len(c) < 2:
         return None, None, None, None
-    low3  = round(closes.min(), 2)
-    high3 = round(closes.max(), 2)
-    last  = round(closes.iloc[-1], 2)
-    rng   = high3 - low3
-    pct   = round((last - low3) / rng * 100, 1) if rng > 0 else 50.0
-    return low3, high3, last, pct
+    lo   = round(c.min(), 2)
+    hi   = round(c.max(), 2)
+    last = round(c.iloc[-1], 2)
+    rng  = hi - lo
+    pct  = round((last - lo) / rng * 100, 1) if rng > 0 else 50.0
+    return lo, hi, last, pct
 
 
-def get_ttm_yield(ticker_obj):
-    """Fetch TTM yield from yfinance info. Returns float (e.g. 0.045) or None."""
+def get_ttm_yield(tk):
     try:
-        info = ticker_obj.info
-        y = info.get("trailingAnnualDividendYield") or info.get("dividendYield")
-        if y and y > 0:
-            return round(y * 100, 2)   # convert to %
+        info = tk.fast_info          # faster than .info
+        y    = getattr(info, "three_month_trailing_price_to_earnings", None)
+        # fall back to full .info only if needed
+        full = tk.info
+        val  = full.get("trailingAnnualDividendYield") or full.get("dividendYield") or 0
+        return round(val * 100, 2) if val and val > 0 else None
     except Exception:
-        pass
-    return None
-
-
-def get_morningstar_url(symbol, override=None):
-    if override:
-        return override
-    return f"https://www.morningstar.com/search#q={symbol}"
+        return None
 
 
 def fetch_vix_signal():
-    """Compare VIX9D vs VIX. Green=Risk On, Red=Risk Off, Grey=neutral."""
     try:
-        vix9d_hist = yf.Ticker("^VIX9D").history(period="5d")
-        vix_hist   = yf.Ticker("^VIX").history(period="5d")
-        if vix9d_hist.empty or vix_hist.empty:
+        v9h  = yf.Ticker("^VIX9D").history(period="5d")
+        vih  = yf.Ticker("^VIX").history(period="5d")
+        if v9h.empty or vih.empty:
             return "grey", None, None
-        v9  = round(vix9d_hist["Close"].iloc[-1], 2)
-        vix = round(vix_hist["Close"].iloc[-1], 2)
-        diff = v9 - vix
-        if abs(diff) <= 0.1:
-            signal = "grey"
-        elif v9 > vix:
-            signal = "red"    # VIX9D > VIX → short-term fear spike → Risk OFF
-        else:
-            signal = "green"  # VIX9D < VIX → calm short-term → Risk ON
-        return signal, round(v9, 2), round(vix, 2)
+        v9  = round(v9h["Close"].iloc[-1], 2)
+        vi  = round(vih["Close"].iloc[-1], 2)
+        sig = "grey" if abs(v9 - vi) <= 0.1 else ("red" if v9 > vi else "green")
+        return sig, v9, vi
     except Exception as e:
-        print(f"  VIX fetch error: {e}")
+        print(f"  VIX error: {e}")
         return "grey", None, None
 
 
@@ -158,54 +136,57 @@ def fetch_all_funds():
     results = []
 
     for fund in funds:
-        ticker      = fund["symbol"]
-        name        = fund.get("name", ticker)
-        ftype       = fund.get("type", "")
-        category    = fund.get("category", "equity")
-        ms_override = fund.get("morningstar_url", None)
+        ticker   = fund["symbol"]
+        name     = fund.get("name", ticker)
+        category = fund.get("category", "equity")
+        ftype    = fund.get("type", "")
+        ms_url   = fund.get("morningstar_url",
+                   f"https://www.morningstar.com/search#q={ticker}")
 
         try:
             tk   = yf.Ticker(ticker)
             hist = tk.history(period="3y")
+
             if hist.empty:
-                print(f"  WARN: No data for {ticker}")
+                print(f"  WARN: no data for {ticker}")
                 continue
 
-            # Performance (using last 14 months window for accuracy)
-            hist_14m = hist.last("14ME")
-            d1  = period_return(hist_14m, 1)
-            w1  = period_return(hist_14m, 7)
-            m1  = period_return(hist_14m, 30)
-            m3  = period_return(hist_14m, 91)
-            m6  = period_return(hist_14m, 182)
-            ytd = ytd_return(hist_14m)
-            y1  = period_return(hist_14m, 365)
+            closes = hist["Close"]
 
-            # RS Score
-            rs = None
+            # ── Performance (use last ~14 months of the 3y history) ──────────
+            cutoff_14m = closes.index[-1] - pd.Timedelta(days=425)
+            c14m = closes[closes.index >= cutoff_14m]
+
+            d1  = period_return(c14m, 1)
+            w1  = period_return(c14m, 7)
+            m1  = period_return(c14m, 30)
+            m3  = period_return(c14m, 91)
+            m6  = period_return(c14m, 182)
+            ytd = ytd_return(c14m)
+            y1  = period_return(c14m, 365)
+
+            rs  = None
             if all(v is not None for v in [d1, w1, m1, m3]):
                 rs = (d1 * 0.10) + (w1 * 0.20) + (m1 * 0.30) + (m3 * 0.40)
 
-            # Z-Score (1 year window)
-            one_yr_ago = hist.index[-1] - pd.Timedelta(days=365)
-            hist_1yr   = hist[hist.index >= one_yr_ago]
-            zsc = zscore_1yr(hist_1yr)
-            if zsc is not None:
-                ob_os = "Overbought" if zsc > 2.10 else ("Oversold" if zsc < -2.05 else "")
-            else:
-                ob_os = ""
+            # ── Z-Score (1-year window) ──────────────────────────────────────
+            cutoff_1y = closes.index[-1] - pd.Timedelta(days=365)
+            c1y  = closes[closes.index >= cutoff_1y]
+            zsc  = zscore_1yr(c1y)
+            ob_os = ("Overbought" if zsc and zsc > 2.10
+                     else "Oversold" if zsc and zsc < -2.05 else "")
 
-            # Flags
-            trade = trade_flag(hist)
-            trend = trend_flag(hist)
+            # ── Flags ────────────────────────────────────────────────────────
+            trade = sma_flag(closes, 21)
+            trend = sma_flag(closes, 63)
 
-            # Sparkline (8 months ≈ 170 trading days)
-            sparkline = make_sparkline(hist, days=170)
+            # ── Sparkline (8 months ≈ 170 trading days) ──────────────────────
+            sparkline = make_sparkline(closes, days=170)
 
-            # 3-Year price bar
-            low3, high3, last_price, bar_pct = price_bar_data(hist)
+            # ── 3-Year price bar ─────────────────────────────────────────────
+            lo3, hi3, last_px, bar_pct = price_bar_data(closes)
 
-            # TTM Yield
+            # ── TTM Yield ────────────────────────────────────────────────────
             ttm = get_ttm_yield(tk)
 
             def fmt(v):
@@ -216,27 +197,29 @@ def fetch_all_funds():
                 "name":            name,
                 "type":            ftype,
                 "category":        category,
-                "morningstar_url": get_morningstar_url(ticker, ms_override),
+                "morningstar_url": ms_url,
                 "sparkline":       sparkline,
-                "1D":  fmt(d1),  "1W":  fmt(w1),  "1M":  fmt(m1),
-                "3M":  fmt(m3),  "6M":  fmt(m6),  "YTD": fmt(ytd), "1Y": fmt(y1),
+                "1D":  fmt(d1),  "1W":  fmt(w1),
+                "1M":  fmt(m1),  "3M":  fmt(m3),
+                "6M":  fmt(m6),  "YTD": fmt(ytd), "1Y": fmt(y1),
                 "rs_score":   round(rs, 3) if rs is not None else None,
                 "zscore":     zsc,
                 "ob_os":      ob_os,
                 "trade_flag": trade,
                 "trend_flag": trend,
-                "low3":       low3,
-                "high3":      high3,
-                "last_price": last_price,
+                "low3":       lo3,
+                "high3":      hi3,
+                "last_price": last_px,
                 "bar_pct":    bar_pct,
                 "ttm_yield":  ttm,
             })
-            print(f"  OK  {ticker}  rs={rs:.2f if rs else 'n/a'}  trade={trade}  trend={trend}  ttm={ttm}")
+            print(f"  OK  {ticker}  rs={'%.2f'%rs if rs else 'n/a'}  "
+                  f"trade={trade}  trend={trend}")
 
         except Exception as e:
             print(f"  ERR {ticker}: {e}")
 
-    # Rank by RS Score
+    # ── Rank ─────────────────────────────────────────────────────────────────
     scored   = sorted([r for r in results if r["rs_score"] is not None],
                       key=lambda x: x["rs_score"], reverse=True)
     unscored = [r for r in results if r["rs_score"] is None]
@@ -248,42 +231,77 @@ def fetch_all_funds():
     return scored + unscored
 
 
-def update_cache():
-    print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M')}] Refreshing ...")
-    data = fetch_all_funds()
-    vix_signal, vix9d_val, vix_val = fetch_vix_signal()
-    cache["data"]        = data
-    cache["last_updated"] = datetime.now().strftime("%-m/%-d/%y  %H:%M ET")
-    cache["vix_signal"]  = vix_signal
-    cache["vix9d_value"] = vix9d_val
-    cache["vix_value"]   = vix_val
-    print(f"Done: {len(data)} funds | VIX signal={vix_signal} VIX9D={vix9d_val} VIX={vix_val}\n")
+def run_update():
+    """Run in a background thread so web requests never time out."""
+    print(f"\n[{datetime.now():%Y-%m-%d %H:%M}] Background refresh starting...")
+    try:
+        data = fetch_all_funds()
+        sig, v9, vi = fetch_vix_signal()
+        with _lock:
+            cache["data"]         = data
+            cache["last_updated"] = datetime.now().strftime("%-m/%-d/%y %H:%M ET")
+            cache["vix_signal"]   = sig
+            cache["vix9d_value"]  = v9 if v9 else "—"
+            cache["vix_value"]    = vi if vi else "—"
+            cache["loading"]      = False
+        print(f"  Done: {len(data)} funds loaded.\n")
+    except Exception as e:
+        print(f"  REFRESH ERROR: {e}")
+        with _lock:
+            cache["loading"] = False
 
+
+def trigger_update():
+    t = threading.Thread(target=run_update, daemon=True)
+    t.start()
+
+
+# ── Kick off background load at startup ───────────────────────────────────────
+trigger_update()
+
+
+# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.route("/")
 def index():
-    if cache["data"] is None:
-        update_cache()
+    with _lock:
+        data        = cache["data"]
+        updated     = cache["last_updated"]
+        vix_signal  = cache["vix_signal"]
+        vix9d       = cache["vix9d_value"]
+        vix         = cache["vix_value"]
+        is_loading  = cache["loading"]
+
     return render_template("index.html",
-                           funds=cache["data"],
-                           last_updated=cache["last_updated"],
-                           vix_signal=cache["vix_signal"],
-                           vix9d=cache["vix9d_value"],
-                           vix=cache["vix_value"])
+                           funds=data,
+                           last_updated=updated,
+                           vix_signal=vix_signal,
+                           vix9d=vix9d,
+                           vix=vix,
+                           is_loading=is_loading)
 
 
 @app.route("/refresh")
 def refresh():
-    update_cache()
-    return jsonify({"status": "ok", "updated": cache["last_updated"],
-                    "funds": len(cache["data"]), "vix_signal": cache["vix_signal"]})
+    trigger_update()
+    return jsonify({"status": "refresh started — check back in ~3 minutes"})
+
+
+@app.route("/status")
+def status():
+    with _lock:
+        return jsonify({
+            "loading":      cache["loading"],
+            "funds":        len(cache["data"]),
+            "last_updated": cache["last_updated"],
+            "vix_signal":   cache["vix_signal"],
+        })
 
 
 @app.route("/api/data")
 def api_data():
-    if cache["data"] is None:
-        update_cache()
-    return jsonify(cache["data"])
+    with _lock:
+        return jsonify(cache["data"])
 
 
 if __name__ == "__main__":
