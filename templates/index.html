@@ -1,301 +1,419 @@
 {% macro pct_cell(v) %}
-  {% if v is none %}
-    <td class="num na">—</td>
-  {% elif v == 0 %}
-    <td class="num zero">0.00%</td>
-  {% elif v >= 5 %}
-    <td class="num pos-3">+{{ '%.2f'|format(v) }}%</td>
-  {% elif v >= 2 %}
-    <td class="num pos-2">+{{ '%.2f'|format(v) }}%</td>
-  {% elif v >= 0.5 %}
-    <td class="num pos-1">+{{ '%.2f'|format(v) }}%</td>
-  {% elif v > 0 %}
-    <td class="num pos-0">+{{ '%.2f'|format(v) }}%</td>
-  {% elif v > -0.5 %}
-    <td class="num neg-0">{{ '%.2f'|format(v) }}%</td>
-  {% elif v > -2 %}
-    <td class="num neg-1">{{ '%.2f'|format(v) }}%</td>
-  {% elif v > -5 %}
-    <td class="num neg-2">{{ '%.2f'|format(v) }}%</td>
-  {% else %}
-    <td class="num neg-3">{{ '%.2f'|format(v) }}%</td>
+  {% if v is none %}<td class="num na">—</td>
+  {% elif v == 0 %}<td class="num zero">0.00%</td>
+  {% elif v >= 5  %}<td class="num p3">+{{ '%.2f'|format(v) }}%</td>
+  {% elif v >= 2  %}<td class="num p2">+{{ '%.2f'|format(v) }}%</td>
+  {% elif v >= 0.5%}<td class="num p1">+{{ '%.2f'|format(v) }}%</td>
+  {% elif v > 0   %}<td class="num p0">+{{ '%.2f'|format(v) }}%</td>
+  {% elif v > -0.5%}<td class="num n0">{{ '%.2f'|format(v) }}%</td>
+  {% elif v > -2  %}<td class="num n1">{{ '%.2f'|format(v) }}%</td>
+  {% elif v > -5  %}<td class="num n2">{{ '%.2f'|format(v) }}%</td>
+  {% else         %}<td class="num n3">{{ '%.2f'|format(v) }}%</td>
   {% endif %}
 {% endmacro %}
-
-{% macro rs_class(v) %}{% if v is none %}{% elif v >= 3 %}rs-pos-hi{% elif v >= 1 %}rs-pos-mid{% elif v > 0 %}rs-pos-lo{% elif v > -1 %}rs-neg-lo{% elif v > -3 %}rs-neg-mid{% else %}rs-neg-hi{% endif %}{% endmacro %}
 
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Fund Performance Dashboard</title>
+<title>KCM Fund Dashboard</title>
 <style>
-  :root {
-    --bg:      #1a1d23;
-    --surface: #22262e;
-    --border:  #2e3340;
-    --text:    #e2e6f0;
-    --muted:   #8892a4;
-    --accent:  #4a9eff;
-    --gold:    #f5c842;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13px; }
+:root {
+  --bg:       #eef1f6;
+  --surface:  #ffffff;
+  --header:   #1e2d45;
+  --border:   #d0d7e3;
+  --text:     #1a2035;
+  --muted:    #6b7280;
+  --accent:   #2563eb;
+  --gold:     #b45309;
 
-  /* ── Header ── */
-  header {
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    padding: 10px 18px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 8px;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-  }
-  header h1 { font-size: 17px; font-weight: 700; }
-  .rs-formula { font-size: 11px; color: var(--muted); font-style: italic; margin-top: 2px; }
-  .meta { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  .badge { background: #2e3340; border-radius: 6px; padding: 4px 10px; font-size: 11px; color: var(--muted); }
-  .badge span { color: var(--text); font-weight: 600; }
-  .btn-refresh { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
-  .btn-refresh:hover { opacity: .85; }
+  /* fund type row tints */
+  --eq-bg:   #fff7ed;   /* light orange */
+  --eq-bd:   #f97316;
+  --bd-bg:   #eff6ff;   /* light blue   */
+  --bd-bd:   #3b82f6;
+  --td-bg:   #fefce8;   /* light yellow */
+  --td-bd:   #ca8a04;
+  --bl-bg:   #f0fdf4;   /* light green  */
+  --bl-bd:   #16a34a;
 
-  /* ── Legend ── */
-  .legend {
-    display: flex;
-    gap: 18px;
-    padding: 8px 18px;
-    background: #1e2330;
-    border-bottom: 1px solid var(--border);
-    flex-wrap: wrap;
-    align-items: center;
-  }
-  .legend-title { font-size: 11px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
-  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
-  .flag-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-  .dot-green { background: #27ae60; }
-  .dot-red   { background: #c0392b; }
-  .dot-grey  { background: #555e6e; }
-  .pill-ob   { background: #7d2d00; color: #ffb347; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
-  .pill-os   { background: #003366; color: #66b2ff; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+  /* performance cell palette */
+  --p3:#14532d; --p3t:#bbf7d0;
+  --p2:#166534; --p2t:#dcfce7;
+  --p1:#15803d; --p1t:#f0fdf4;
+  --p0:#d1fae5; --p0t:#065f46;
+  --n0:#fee2e2; --n0t:#991b1b;
+  --n1:#fca5a5; --n1t:#7f1d1d;
+  --n2:#ef4444; --n2t:#ffffff;
+  --n3:#991b1b; --n3t:#fecaca;
+}
 
-  /* ── Table ── */
-  .table-wrap { overflow-x: auto; padding: 12px 10px; }
-  table { border-collapse: collapse; min-width: 1050px; width: 100%; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 12.5px; }
 
-  thead th {
-    background: #2a2f3a;
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: .5px;
-    text-transform: uppercase;
-    padding: 7px 9px;
-    border-bottom: 2px solid var(--border);
-    cursor: pointer;
-    user-select: none;
-    white-space: nowrap;
-  }
-  thead th:hover { color: var(--text); }
-  thead th.sorted-asc::after  { content: " ▲"; color: var(--accent); }
-  thead th.sorted-desc::after { content: " ▼"; color: var(--accent); }
-  .group-header { background: #1e2330 !important; text-align: center; font-size: 10px; border-bottom: 1px solid var(--accent) !important; }
-  .gh-perf  { color: #4aff8a !important; }
-  .gh-ind   { color: #ffcc44 !important; }
-  .gh-flag  { color: #ff8c44 !important; }
+/* ── Header ── */
+header {
+  background: var(--header);
+  color: #fff;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  box-shadow: 0 2px 8px rgba(0,0,0,.25);
+}
+.h-left h1 { font-size: 16px; font-weight: 700; letter-spacing: .3px; }
+.h-left .formula { font-size: 10.5px; color: #93c5fd; margin-top: 2px; }
+.h-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-  tbody tr { border-bottom: 1px solid var(--border); transition: background .12s; }
-  tbody tr:hover { background: #2a2f3a; }
-  td { padding: 6px 9px; white-space: nowrap; }
+.badge { background: rgba(255,255,255,.12); border-radius: 6px;
+         padding: 4px 10px; font-size: 11px; color: #cbd5e1; }
+.badge b { color: #fff; }
 
-  td.rank   { font-weight: 800; font-size: 15px; color: var(--gold); text-align: center; width: 36px; }
-  td.symbol { font-weight: 700; font-size: 13px; font-family: 'Courier New', monospace; }
-  td.symbol a { color: var(--accent); text-decoration: none; }
-  td.symbol a:hover { text-decoration: underline; }
-  td.fname  { color: var(--text); max-width: 210px; overflow: hidden; text-overflow: ellipsis; }
-  td.num    { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; min-width: 60px; }
-  td.rs     { text-align: right; font-weight: 700; font-size: 13px; min-width: 68px; font-variant-numeric: tabular-nums; }
-  td.zsc    { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; min-width: 52px; color: var(--muted); }
-  td.flag-cell { text-align: center; min-width: 52px; }
+/* Risk On/Off pill */
+.risk-pill {
+  border-radius: 6px; padding: 5px 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: .4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.risk-green { background: #166534; color: #bbf7d0; }
+.risk-red   { background: #991b1b; color: #fecaca; }
+.risk-grey  { background: #374151; color: #d1d5db; }
+.risk-dot   { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.rdot-green { background: #4ade80; }
+.rdot-red   { background: #f87171; }
+.rdot-grey  { background: #9ca3af; }
 
-  /* Performance colors */
-  .pos-3 { background: #0d5c1e; color: #7fffa0; }
-  .pos-2 { background: #1a7a2a; color: #b2ffc0; }
-  .pos-1 { background: #236b30; color: #d4ffd8; }
-  .pos-0 { background: #1e3d26; color: #c8f0ce; }
-  .neg-0 { background: #3d1e1e; color: #f0c8c8; }
-  .neg-1 { background: #6b2323; color: #ffd4d4; }
-  .neg-2 { background: #7a1a1a; color: #ffb2b2; }
-  .neg-3 { background: #5c0d0d; color: #ff9999; }
-  .zero  { background: #252a35; color: var(--muted); }
-  .na    { color: var(--muted); text-align: right; }
+.btn-refresh {
+  background: #2563eb; color: #fff; border: none; border-radius: 6px;
+  padding: 6px 14px; font-size: 12px; font-weight: 600;
+  cursor: pointer; text-decoration: none; display: inline-block;
+}
+.btn-refresh:hover { background: #1d4ed8; }
 
-  /* RS score colors */
-  .rs-pos-hi  { color: #7fffa0; }
-  .rs-pos-mid { color: #b2ffd4; }
-  .rs-pos-lo  { color: #d4ffe4; }
-  .rs-neg-lo  { color: #ffd4d4; }
-  .rs-neg-mid { color: #ffb2b2; }
-  .rs-neg-hi  { color: #ff8080; }
+/* ── Legend bar ── */
+.legend {
+  background: #f8fafc;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 14px;
+  display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
+  font-size: 11px; color: var(--muted);
+}
+.legend b { color: var(--text); }
+.flag-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; vertical-align: middle; }
+.dot-g { background: #16a34a; }
+.dot-r { background: #dc2626; }
+.dot-gr{ background: #9ca3af; }
+.cat-chip { border-radius: 4px; padding: 1px 7px; font-size: 10.5px; font-weight: 600; }
+.chip-eq { background: var(--eq-bg); color: #9a3412; border: 1px solid #fdba74; }
+.chip-bd { background: var(--bd-bg); color: #1e40af; border: 1px solid #93c5fd; }
+.chip-td { background: var(--td-bg); color: #713f12; border: 1px solid #fcd34d; }
+.chip-bl { background: var(--bl-bg); color: #166534; border: 1px solid #86efac; }
 
-  /* Flag circles */
-  .flag-circle {
-    display: inline-block;
-    width: 14px; height: 14px;
-    border-radius: 50%;
-    vertical-align: middle;
-  }
-  .flag-green { background: #27ae60; box-shadow: 0 0 5px #27ae6088; }
-  .flag-red   { background: #c0392b; box-shadow: 0 0 5px #c0392b88; }
-  .flag-grey  { background: #555e6e; }
+/* ── Toggle hidden cols ── */
+.toggle-bar {
+  background: #f1f5f9; border-bottom: 1px solid var(--border);
+  padding: 4px 14px; font-size: 11px; color: var(--muted);
+  display: flex; gap: 16px; align-items: center;
+}
+.toggle-bar button {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  padding: 2px 9px; font-size: 11px; cursor: pointer; color: var(--accent);
+}
+.toggle-bar button:hover { background: #e0e7ff; }
 
-  /* Overbought / Oversold pills */
-  .pill-overbought { background: #7d2d00; color: #ffb347; border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 700; letter-spacing: .3px; }
-  .pill-oversold   { background: #003366; color: #66b2ff; border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 700; letter-spacing: .3px; }
-  .pill-none       { color: var(--muted); font-size: 11px; }
+/* ── Table ── */
+.table-wrap { overflow-x: auto; padding: 10px 8px 24px; }
 
-  footer { text-align: center; padding: 18px; color: var(--muted); font-size: 11px; }
+table { border-collapse: collapse; min-width: 1100px; width: 100%; background: var(--surface); border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+
+thead th {
+  background: #1e2d45; color: #93c5fd;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  padding: 7px 8px; border-bottom: 2px solid #334155;
+  cursor: pointer; user-select: none; white-space: nowrap;
+}
+thead th:hover { color: #fff; }
+thead th.sorted-asc::after  { content: " ▲"; color: #fbbf24; }
+thead th.sorted-desc::after { content: " ▼"; color: #fbbf24; }
+
+.gh { background: #0f172a !important; color: #64748b !important; font-size: 9.5px !important; text-align: center; border-bottom: 1px solid #334155 !important; cursor: default !important; }
+.gh-perf  { color: #4ade80 !important; }
+.gh-ind   { color: #fbbf24 !important; }
+.gh-flag  { color: #fb923c !important; }
+.gh-bar   { color: #a78bfa !important; }
+
+tbody tr { border-bottom: 1px solid #f1f5f9; transition: background .1s; }
+tbody tr:hover { background: #f0f7ff !important; }
+
+/* Row tints by category — applied via class on <tr> */
+tr.cat-equity      { background: var(--eq-bg); }
+tr.cat-bond        { background: var(--bd-bg); }
+tr.cat-target_date { background: var(--td-bg); }
+tr.cat-balanced    { background: var(--bl-bg); }
+
+td { padding: 5px 8px; white-space: nowrap; vertical-align: middle; }
+
+td.rank   { font-weight: 800; font-size: 14px; color: var(--gold); text-align: center; width: 34px; }
+td.sym a  { font-weight: 700; font-size: 12.5px; font-family: 'Courier New', monospace; color: var(--accent); text-decoration: none; }
+td.sym a:hover { text-decoration: underline; }
+td.fname  { max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+td.ftype  { font-size: 10px; color: var(--muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+td.spark  { padding: 3px 6px; }
+td.num    { text-align: right; font-variant-numeric: tabular-nums; min-width: 58px; }
+td.na     { text-align: right; color: var(--muted); }
+
+/* Performance colors */
+.p3 { background: var(--p3) !important; color: var(--p3t); }
+.p2 { background: var(--p2) !important; color: var(--p2t); }
+.p1 { background: var(--p1) !important; color: var(--p1t); }
+.p0 { background: var(--p0) !important; color: var(--p0t); }
+.n0 { background: var(--n0) !important; color: var(--n0t); }
+.n1 { background: var(--n1) !important; color: var(--n1t); }
+.n2 { background: var(--n2) !important; color: var(--n2t); }
+.n3 { background: var(--n3) !important; color: var(--n3t); }
+.zero { background: #f9fafb !important; color: var(--muted); text-align: right; }
+
+/* Flag circles */
+.fc { display: inline-block; width: 13px; height: 13px; border-radius: 50%; }
+.fc-green { background: #16a34a; box-shadow: 0 0 4px #16a34a88; }
+.fc-red   { background: #dc2626; box-shadow: 0 0 4px #dc262688; }
+.fc-grey  { background: #d1d5db; }
+td.flag-cell { text-align: center; min-width: 48px; }
+
+/* OB/OS pills */
+.pill-ob { background: #fff7ed; color: #c2410c; border: 1px solid #fb923c; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+.pill-os { background: #eff6ff; color: #1d4ed8; border: 1px solid #60a5fa; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
+
+/* RS Score */
+td.rs { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; min-width: 64px; }
+.rs-hi  { color: #15803d; }
+.rs-mid { color: #4b5563; }
+.rs-lo  { color: #dc2626; }
+
+/* Z-Score */
+td.zsc { text-align: right; font-variant-numeric: tabular-nums; min-width: 50px; color: var(--muted); }
+
+/* TTM Yield */
+td.ttm { text-align: right; font-variant-numeric: tabular-nums; min-width: 52px; color: #0f766e; font-weight: 600; }
+
+/* 3-Year price bar */
+td.bar-cell { min-width: 160px; padding: 4px 8px; }
+.bar-wrap { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); }
+.bar-track { flex: 1; background: #e5e7eb; border-radius: 3px; height: 8px; position: relative; min-width: 60px; }
+.bar-fill  { height: 100%; background: #2563eb; border-radius: 3px; min-width: 2px; }
+.bar-marker { position: absolute; top: -2px; width: 2px; height: 12px; background: #1d4ed8; border-radius: 1px; }
+.bar-lo, .bar-hi { font-size: 9.5px; min-width: 32px; }
+.bar-lo { text-align: right; }
+.bar-hi { text-align: left;  }
+
+/* Hidden columns */
+.col-hidden { display: none; }
+
+footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 4px; background: var(--surface); }
 </style>
 </head>
 <body>
 
+<!-- ── Header ── -->
 <header>
-  <div>
-    <h1>📊 Fund Performance Dashboard</h1>
-    <div class="rs-formula">RS Score = (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40) &nbsp;|&nbsp; Rank 1 = strongest</div>
+  <div class="h-left">
+    <h1>📊 KCM Fund Performance Dashboard</h1>
+    <div class="formula">RS Score = (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40) &nbsp;|&nbsp; Rank 1 = strongest relative strength</div>
   </div>
-  <div class="meta">
-    <div class="badge">Last Update: <span>{{ last_updated }}</span></div>
-    <div class="badge">Funds: <span>{{ funds | length }}</span></div>
+  <div class="h-right">
+
+    <!-- Risk On/Off -->
+    {% if vix_signal == 'green' %}
+    <div class="risk-pill risk-green">
+      <span class="risk-dot rdot-green"></span>
+      RISK ON &nbsp;|&nbsp; VIX9D {{ vix9d }} &lt; VIX {{ vix }}
+    </div>
+    {% elif vix_signal == 'red' %}
+    <div class="risk-pill risk-red">
+      <span class="risk-dot rdot-red"></span>
+      RISK OFF &nbsp;|&nbsp; VIX9D {{ vix9d }} &gt; VIX {{ vix }}
+    </div>
+    {% else %}
+    <div class="risk-pill risk-grey">
+      <span class="risk-dot rdot-grey"></span>
+      RISK NEUTRAL &nbsp;|&nbsp; VIX9D {{ vix9d }} ≈ VIX {{ vix }}
+    </div>
+    {% endif %}
+
+    <div class="badge">Updated: <b>{{ last_updated }}</b></div>
+    <div class="badge">Funds: <b>{{ funds|length }}</b></div>
     <a class="btn-refresh" href="/refresh" onclick="return doRefresh()">⟳ Refresh</a>
   </div>
 </header>
 
-<!-- Legend bar -->
+<!-- ── Legend ── -->
 <div class="legend">
-  <span class="legend-title">Legend:</span>
-
-  <span class="legend-item"><b style="color:#ffcc44">Trade/Trend Flags</b></span>
-  <span class="legend-item"><span class="flag-dot dot-green"></span> Price &gt; avg (strong)</span>
-  <span class="legend-item"><span class="flag-dot dot-grey"></span>  In between</span>
-  <span class="legend-item"><span class="flag-dot dot-red"></span>  Price &lt; avg (weak)</span>
-
-  <span style="color:var(--border)">|</span>
-
-  <span class="legend-item"><b style="color:#ffcc44">Z-Score Flags (1yr)</b></span>
-  <span class="legend-item"><span class="pill-ob">Overbought</span> &nbsp;z &gt; 2.10</span>
-  <span class="legend-item"><span class="pill-os">Oversold</span> &nbsp;z &lt; −2.05</span>
-
-  <span style="color:var(--border)">|</span>
-
-  <span class="legend-item" style="font-size:10px; color:var(--muted)">Trade = 21-day SMA &nbsp;|&nbsp; Trend = 63-day SMA &nbsp;|&nbsp; Symbol links to Morningstar</span>
+  <b>Flags:</b>
+  <span><span class="flag-dot dot-g"></span> Above avg</span>
+  <span><span class="flag-dot dot-gr"></span> At avg</span>
+  <span><span class="flag-dot dot-r"></span> Below avg</span>
+  &nbsp;|&nbsp;
+  <b>Trade</b> = 21-day SMA &nbsp; <b>Trend</b> = 63-day SMA &nbsp;|&nbsp;
+  <b>Fund Types:</b>
+  <span class="cat-chip chip-eq">Equity</span>
+  <span class="cat-chip chip-bd">Bond</span>
+  <span class="cat-chip chip-td">Target Date</span>
+  <span class="cat-chip chip-bl">Balanced</span>
+  &nbsp;|&nbsp; Symbol = Morningstar link
 </div>
 
+<!-- ── Toggle hidden columns ── -->
+<div class="toggle-bar">
+  <span>Optional columns:</span>
+  <button onclick="toggleCol('rs-col')">RS Score</button>
+  <button onclick="toggleCol('zsc-col')">Z-Score</button>
+  <button onclick="toggleCol('obos-col')">OB / OS</button>
+</div>
+
+<!-- ── Table ── -->
 <div class="table-wrap">
-  <table id="fundTable">
-    <thead>
-      <tr>
-        <th class="group-header" colspan="3"></th>
-        <th class="group-header gh-perf" colspan="7">◀ Performance % ▶</th>
-        <th class="group-header gh-ind"  colspan="3">◀ Indicators ▶</th>
-        <th class="group-header gh-flag" colspan="2">◀ Flags ▶</th>
-      </tr>
-      <tr>
-        <th onclick="sortTable(0)"  data-col="0">Rank</th>
-        <th onclick="sortTable(1)"  data-col="1">Symbol</th>
-        <th onclick="sortTable(2)"  data-col="2">Fund Name</th>
-        <th onclick="sortTable(3)"  data-col="3">1D</th>
-        <th onclick="sortTable(4)"  data-col="4">1W</th>
-        <th onclick="sortTable(5)"  data-col="5">1M</th>
-        <th onclick="sortTable(6)"  data-col="6">3M</th>
-        <th onclick="sortTable(7)"  data-col="7">6M</th>
-        <th onclick="sortTable(8)"  data-col="8">YTD</th>
-        <th onclick="sortTable(9)"  data-col="9">1Y</th>
-        <th onclick="sortTable(10)" data-col="10">RS Score</th>
-        <th onclick="sortTable(11)" data-col="11">Z-Score</th>
-        <th onclick="sortTable(12)" data-col="12">OB / OS</th>
-        <th onclick="sortTable(13)" data-col="13">Trade</th>
-        <th onclick="sortTable(14)" data-col="14">Trend</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for f in funds %}
-      <tr>
-        <td class="rank">{{ f.rank if f.rank else '—' }}</td>
+<table id="ft">
+  <thead>
+    <tr>
+      <th class="gh" colspan="3"></th>
+      <th class="gh gh-perf" colspan="2">8-Mo Chart</th>
+      <th class="gh gh-perf" colspan="7">◀ Performance % ▶</th>
+      <th class="gh gh-bar"  colspan="1">3-Yr Range</th>
+      <th class="gh gh-ind"  colspan="1">TTM Yield</th>
+      <th class="gh gh-ind col-hidden rs-col"  colspan="1">RS Score</th>
+      <th class="gh gh-ind col-hidden zsc-col" colspan="1">Z-Score</th>
+      <th class="gh gh-ind col-hidden obos-col"colspan="1">OB/OS</th>
+      <th class="gh gh-flag" colspan="2">◀ Flags ▶</th>
+    </tr>
+    <tr>
+      <th onclick="sortTable(0)"  data-col="0">Rank</th>
+      <th onclick="sortTable(1)"  data-col="1">Symbol</th>
+      <th onclick="sortTable(2)"  data-col="2">Fund Name</th>
+      <th data-col="3" style="cursor:default">Sparkline</th>
+      <th onclick="sortTable(4)"  data-col="4">Fund Type</th>
+      <th onclick="sortTable(5)"  data-col="5">1D</th>
+      <th onclick="sortTable(6)"  data-col="6">1W</th>
+      <th onclick="sortTable(7)"  data-col="7">1M</th>
+      <th onclick="sortTable(8)"  data-col="8">3M</th>
+      <th onclick="sortTable(9)"  data-col="9">6M</th>
+      <th onclick="sortTable(10)" data-col="10">YTD</th>
+      <th onclick="sortTable(11)" data-col="11">1Y</th>
+      <th onclick="sortTable(12)" data-col="12" style="min-width:160px">3-Yr Lo ▸ Last ▸ Hi</th>
+      <th onclick="sortTable(13)" data-col="13">TTM %</th>
+      <th onclick="sortTable(14)" data-col="14" class="col-hidden rs-col">RS Score</th>
+      <th onclick="sortTable(15)" data-col="15" class="col-hidden zsc-col">Z-Score</th>
+      <th onclick="sortTable(16)" data-col="16" class="col-hidden obos-col">OB / OS</th>
+      <th onclick="sortTable(17)" data-col="17">Trade</th>
+      <th onclick="sortTable(18)" data-col="18">Trend</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for f in funds %}
+  <tr class="cat-{{ f.category }}">
 
-        <td class="symbol">
-          <a href="{{ f.morningstar_url }}" target="_blank" title="Morningstar: {{ f.symbol }}">{{ f.symbol }}</a>
-        </td>
+    <td class="rank">{{ f.rank if f.rank else '—' }}</td>
 
-        <td class="fname">{{ f.name }}</td>
+    <td class="sym"><a href="{{ f.morningstar_url }}" target="_blank">{{ f.symbol }}</a></td>
 
-        {{ pct_cell(f['1D'])  }}
-        {{ pct_cell(f['1W'])  }}
-        {{ pct_cell(f['1M'])  }}
-        {{ pct_cell(f['3M'])  }}
-        {{ pct_cell(f['6M'])  }}
-        {{ pct_cell(f['YTD']) }}
-        {{ pct_cell(f['1Y'])  }}
+    <td class="fname">{{ f.name }}</td>
 
-        <td class="rs {{ rs_class(f.rs_score) }}">
-          {{ '%.3f'|format(f.rs_score) if f.rs_score is not none else '—' }}
-        </td>
+    <!-- Sparkline -->
+    <td class="spark">{{ f.sparkline | safe }}</td>
 
-        <!-- Z-Score -->
-        <td class="zsc">
-          {% if f.zscore is not none %}
-            {{ '%.2f'|format(f.zscore) }}
-          {% else %}—{% endif %}
-        </td>
+    <!-- Fund Type chip -->
+    <td class="ftype">
+      {% if f.category == 'equity' %}
+        <span class="cat-chip chip-eq">{{ f.type }}</span>
+      {% elif f.category == 'bond' %}
+        <span class="cat-chip chip-bd">{{ f.type }}</span>
+      {% elif f.category == 'target_date' %}
+        <span class="cat-chip chip-td">{{ f.type }}</span>
+      {% else %}
+        <span class="cat-chip chip-bl">{{ f.type }}</span>
+      {% endif %}
+    </td>
 
-        <!-- Overbought / Oversold pill -->
-        <td class="flag-cell">
-          {% if f.ob_os == 'Overbought' %}
-            <span class="pill-overbought">Overbought</span>
-          {% elif f.ob_os == 'Oversold' %}
-            <span class="pill-oversold">Oversold</span>
-          {% else %}
-            <span class="pill-none">—</span>
-          {% endif %}
-        </td>
+    <!-- Performance -->
+    {{ pct_cell(f['1D'])  }}
+    {{ pct_cell(f['1W'])  }}
+    {{ pct_cell(f['1M'])  }}
+    {{ pct_cell(f['3M'])  }}
+    {{ pct_cell(f['6M'])  }}
+    {{ pct_cell(f['YTD']) }}
+    {{ pct_cell(f['1Y'])  }}
 
-        <!-- Trade flag -->
-        <td class="flag-cell" title="Trade: 21-day SMA">
-          <span class="flag-circle flag-{{ f.trade_flag }}"></span>
-        </td>
+    <!-- 3-Year Price Range Bar -->
+    <td class="bar-cell">
+      {% if f.bar_pct is not none %}
+      <div class="bar-wrap">
+        <span class="bar-lo">${{ f.low3 }}</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="width:{{ [f.bar_pct, 100]|min }}%"></div>
+        </div>
+        <span class="bar-hi">${{ f.high3 }}</span>
+      </div>
+      <div style="font-size:9.5px; color:var(--muted); text-align:center; margin-top:1px;">Last ${{ f.last_price }} &nbsp;({{ f.bar_pct }}% of range)</div>
+      {% else %}<span class="na">—</span>{% endif %}
+    </td>
 
-        <!-- Trend flag -->
-        <td class="flag-cell" title="Trend: 63-day SMA">
-          <span class="flag-circle flag-{{ f.trend_flag }}"></span>
-        </td>
+    <!-- TTM Yield -->
+    <td class="ttm num">
+      {% if f.ttm_yield %}{{ '%.2f'|format(f.ttm_yield) }}%{% else %}<span style="color:var(--muted)">—</span>{% endif %}
+    </td>
 
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <!-- RS Score (hidden by default) -->
+    <td class="rs col-hidden rs-col {% if f.rs_score and f.rs_score > 1 %}rs-hi{% elif f.rs_score and f.rs_score < -1 %}rs-lo{% else %}rs-mid{% endif %}">
+      {{ '%.3f'|format(f.rs_score) if f.rs_score is not none else '—' }}
+    </td>
+
+    <!-- Z-Score (hidden by default) -->
+    <td class="zsc col-hidden zsc-col">
+      {{ '%.2f'|format(f.zscore) if f.zscore is not none else '—' }}
+    </td>
+
+    <!-- OB/OS (hidden by default) -->
+    <td class="flag-cell col-hidden obos-col">
+      {% if f.ob_os == 'Overbought' %}<span class="pill-ob">Overbought</span>
+      {% elif f.ob_os == 'Oversold'  %}<span class="pill-os">Oversold</span>
+      {% else %}<span style="color:var(--muted)">—</span>{% endif %}
+    </td>
+
+    <!-- Trade flag -->
+    <td class="flag-cell" title="Trade: vs 21-day SMA">
+      <span class="fc fc-{{ f.trade_flag }}"></span>
+    </td>
+
+    <!-- Trend flag -->
+    <td class="flag-cell" title="Trend: vs 63-day SMA">
+      <span class="fc fc-{{ f.trend_flag }}"></span>
+    </td>
+
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
 </div>
 
 <footer>
-  Data: Yahoo Finance via yfinance &nbsp;|&nbsp;
-  Refreshes after US market close (4 PM ET) &nbsp;|&nbsp;
-  Symbol links open Morningstar portfolio page &nbsp;|&nbsp;
-  Click any column to sort
+  Data: Yahoo Finance &nbsp;|&nbsp; Refreshes after US market close (4 PM ET) &nbsp;|&nbsp; Symbol links → Morningstar &nbsp;|&nbsp; Click any column header to sort
 </footer>
 
 <script>
+// ── Sort ──────────────────────────────────────────────────────────────────────
 let sortCol = 0, sortAsc = true;
 
 function sortTable(col) {
-  const table = document.getElementById("fundTable");
-  const tbody = table.tBodies[0];
+  const tbody = document.querySelector("#ft tbody");
   const rows  = Array.from(tbody.rows);
   if (sortCol === col) { sortAsc = !sortAsc; }
-  else { sortCol = col; sortAsc = col <= 2; }
+  else { sortCol = col; sortAsc = (col <= 2 || col === 4); }
   rows.sort((a, b) => {
     const av = cellVal(a.cells[col]);
     const bv = cellVal(b.cells[col]);
@@ -305,37 +423,41 @@ function sortTable(col) {
     return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
   });
   rows.forEach(r => tbody.appendChild(r));
-  document.querySelectorAll("thead tr:nth-child(2) th").forEach((th, i) => {
-    th.classList.remove("sorted-asc","sorted-desc");
+  document.querySelectorAll("#ft thead tr:nth-child(2) th").forEach((th, i) => {
+    th.classList.remove("sorted-asc", "sorted-desc");
     if (i === col) th.classList.add(sortAsc ? "sorted-asc" : "sorted-desc");
   });
 }
 
 function cellVal(cell) {
-  const t = cell.innerText.trim();
-  if (t === "—" || t === "") return null;
-  // Flag circles: sort by color text from class
-  const circle = cell.querySelector(".flag-circle");
+  const circle = cell.querySelector(".fc");
   if (circle) {
-    if (circle.classList.contains("flag-green")) return 1;
-    if (circle.classList.contains("flag-grey"))  return 0;
-    if (circle.classList.contains("flag-red"))   return -1;
+    if (circle.classList.contains("fc-green")) return 1;
+    if (circle.classList.contains("fc-grey"))  return 0;
+    if (circle.classList.contains("fc-red"))   return -1;
     return null;
   }
-  const n = parseFloat(t.replace(/%/g,""));
+  const t = cell.innerText.trim().replace(/[+%$,]/g, "");
+  if (t === "—" || t === "") return null;
+  const n = parseFloat(t);
   return isNaN(n) ? t.toLowerCase() : n;
 }
 
+// ── Toggle hidden columns ─────────────────────────────────────────────────────
+function toggleCol(cls) {
+  document.querySelectorAll("." + cls).forEach(el => {
+    el.classList.toggle("col-hidden");
+  });
+}
+
+// ── Refresh ───────────────────────────────────────────────────────────────────
 function doRefresh() {
   const btn = document.querySelector(".btn-refresh");
   btn.textContent = "⏳ Refreshing…";
   btn.style.opacity = ".6";
   fetch("/refresh")
     .then(r => r.json())
-    .then(d => {
-      btn.textContent = "✓ Done — reloading";
-      setTimeout(() => location.reload(), 800);
-    })
+    .then(() => { btn.textContent = "✓ Reloading…"; setTimeout(() => location.reload(), 600); })
     .catch(() => { btn.textContent = "✗ Error"; btn.style.opacity = "1"; });
   return false;
 }
