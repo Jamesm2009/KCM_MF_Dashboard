@@ -1,4 +1,4 @@
 flask>=3.0
-yfinance>=0.2
+yfinance==0.2.54
 pandas>=2.0
 gunicorn>=21.0
