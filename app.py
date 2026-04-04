@@ -12,6 +12,7 @@ from flask import Flask, render_template, jsonify
 import requests
 import pandas as pd
 import threading
+import time
 from datetime import datetime, date, timedelta
 import json, os
 
@@ -239,6 +240,8 @@ def phase1(funds):
         except Exception as e:
             print(f"    ERR: {e}")
 
+        time.sleep(1.5)  # stay within Tiingo free tier rate limit
+
     with _lock:
         cache["phase"]        = 2
         cache["last_updated"] = datetime.now().strftime("%-m/%-d/%y %H:%M ET")
@@ -281,6 +284,8 @@ def phase2(funds):
 
         except Exception as e:
             print(f"    ERR: {e}")
+
+        time.sleep(1.5)  # rate limit
 
     with _lock:
         cache["phase"]        = 3
