@@ -132,16 +132,31 @@ def make_sparkline(closes, days=170, w=90, h=28):
             f'</svg>')
 
 
-def calc_ttm_yield(df, closes):
+def calc_ttm_yield(df):
+    """
+    Calculate TTM yield using unadjusted close price (not adjClose).
+    Filters out large capital gains distributions (typically >> regular dividends)
+    to match Morningstar's TTM Yield which counts only income dividends.
+    """
     try:
-        cutoff  = closes.index[-1] - pd.Timedelta(days=365)
-        div_col = "divCash" if "divCash" in df.columns else None
-        if not div_col:
+        if "divCash" not in df.columns or "close" not in df.columns:
             return None
-        ttm_div = df[div_col][df.index >= cutoff].sum()
-        cur_px  = closes.iloc[-1]
+        cutoff   = df.index[-1] - pd.Timedelta(days=365)
+        divs     = df["divCash"][df.index >= cutoff]
+        divs     = divs[divs > 0]   # drop zero rows
+        if divs.empty:
+            return None
+        # Filter out capital gains: exclude any payment > 3x the median payment
+        # (cap gains distributions are typically much larger than income dividends)
+        median = divs.median()
+        income_divs = divs[divs <= median * 3]
+        if income_divs.empty:
+            income_divs = divs   # fallback: use all if filtering removes everything
+        ttm_div = income_divs.sum()
+        cur_px  = df["close"].dropna().iloc[-1]   # unadjusted price
         if ttm_div > 0 and cur_px > 0:
-            return round(ttm_div / cur_px * 100, 2)
+            val = round(ttm_div / cur_px * 100, 2)
+            return val if val <= 12 else None   # sanity cap
     except Exception:
         pass
     return None
@@ -265,7 +280,7 @@ def run_update():
                         "trade_flag": sma_flag(closes, 21),
                         "trend_flag": sma_flag(closes, 63),
                         "low3": lo, "high3": hi, "last_price": last, "bar_pct": pct,
-                        "ttm_yield":  calc_ttm_yield(df, closes),
+                        "ttm_yield":  calc_ttm_yield(df),
                         "rank": None,
                     }
                     rebuild_ranked()
