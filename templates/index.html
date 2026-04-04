@@ -275,17 +275,17 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
     {% if vix_signal == 'green' %}
     <div class="risk-pill risk-green">
       <span class="risk-dot rdot-green"></span>
-      RISK ON &nbsp;|&nbsp; VIX9D {{ vix9d }} &lt; VIX {{ vix }}
+      RISK ON &nbsp;|&nbsp; VIXY {{ vix9d }} &lt; VXX {{ vix }}
     </div>
     {% elif vix_signal == 'red' %}
     <div class="risk-pill risk-red">
       <span class="risk-dot rdot-red"></span>
-      RISK OFF &nbsp;|&nbsp; VIX9D {{ vix9d }} &gt; VIX {{ vix }}
+      RISK OFF &nbsp;|&nbsp; VIXY {{ vix9d }} &gt; VXX {{ vix }}
     </div>
     {% else %}
     <div class="risk-pill risk-grey">
       <span class="risk-dot rdot-grey"></span>
-      RISK NEUTRAL &nbsp;|&nbsp; VIX9D {{ vix9d }} ≈ VIX {{ vix }}
+      RISK NEUTRAL &nbsp;|&nbsp; VIXY {{ vix9d }} ≈ VXX {{ vix }}
     </div>
     {% endif %}
 
@@ -444,7 +444,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 </div>
 
 <footer>
-  Data: Yahoo Finance &nbsp;|&nbsp; Refreshes after US market close (4 PM ET) &nbsp;|&nbsp; Symbol links → Morningstar &nbsp;|&nbsp; Click any column header to sort
+  Data: Yahoo Finance &nbsp;|&nbsp; Refreshes after US market close (3 PM CT) &nbsp;|&nbsp; Symbol links → Morningstar &nbsp;|&nbsp; Click any column header to sort
 </footer>
 
 <script>
