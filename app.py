@@ -132,26 +132,6 @@ def make_sparkline(closes, days=170, w=90, h=28):
             f'</svg>')
 
 
-        cutoff   = df.index[-1] - pd.Timedelta(days=365)
-        divs     = df["divCash"][df.index >= cutoff]
-        divs     = divs[divs > 0]   # drop zero rows
-        if divs.empty:
-            return None
-        # Filter out capital gains: exclude any payment > 3x the median payment
-        # (cap gains distributions are typically much larger than income dividends)
-        median = divs.median()
-        income_divs = divs[divs <= median * 3]
-        if income_divs.empty:
-            income_divs = divs   # fallback: use all if filtering removes everything
-        ttm_div = income_divs.sum()
-        cur_px  = df["close"].dropna().iloc[-1]   # unadjusted price
-        if ttm_div > 0 and cur_px > 0:
-            val = round(ttm_div / cur_px * 100, 2)
-            return val if val <= 12 else None   # sanity cap
-    except Exception:
-        pass
-    return None
-
 
 def rebuild_ranked():
     rows     = list(cache["data"].values())
