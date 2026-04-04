@@ -105,16 +105,19 @@ def sma_flag(closes, window):
 
 
 def make_sparkline(closes, days=170, w=90, h=28):
-    c = closes.dropna().tail(days).values
-    if len(c) < 2:
+    c = closes.dropna()
+    tail = c.tail(days).values
+    if len(tail) < 2:
         return ""
-    mn, mx = c.min(), c.max()
+    mn, mx = tail.min(), tail.max()
     if mn == mx:
         return ""
-    n   = len(c) - 1
+    n   = len(tail) - 1
     pts = [f"{round(i/n*w,1)},{round((1-(v-mn)/(mx-mn))*(h-2)+1,1)}"
-           for i, v in enumerate(c)]
-    col = "#16a34a" if c[-1] >= c[0] else "#dc2626"
+           for i, v in enumerate(tail)]
+    # Green if last price > 63-day SMA, red if below
+    sma63 = c.tail(63).mean() if len(c) >= 63 else c.mean()
+    col   = "#16a34a" if c.iloc[-1] > sma63 else "#dc2626"
     return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
             f'xmlns="http://www.w3.org/2000/svg">'
             f'<polyline points="{" ".join(pts)}" fill="none" stroke="{col}" '
@@ -285,13 +288,24 @@ def run_update():
 def trigger_update():
     threading.Thread(target=run_update, daemon=True).start()
 
-trigger_update()
+# Do NOT call trigger_update() here — gunicorn forks workers AFTER module
+# import, killing any threads started here. Instead we start on first request.
+_started = False
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+def _ensure_started():
+    """Start the background loader on the very first request in this worker."""
+    global _started
+    if not _started:
+        _started = True
+        trigger_update()
+
+
 @app.route("/")
 def index():
+    _ensure_started()
     with _lock:
         snap  = dict(cache)
         funds = list(snap["ranked"])
@@ -312,6 +326,7 @@ def refresh():
 
 @app.route("/status")
 def status():
+    _ensure_started()
     with _lock:
         return jsonify({
             "phase":        cache["phase"],
