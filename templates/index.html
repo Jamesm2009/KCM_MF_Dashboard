@@ -219,40 +219,6 @@ td.bar-cell { min-width: 160px; padding: 4px 8px; }
 
 footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 4px; background: var(--surface); }
 
-/* ── Sticky first 3 columns ── */
-td:nth-child(1), thead th:nth-child(1) {
-  position: sticky; left: 0; z-index: 3;
-  min-width: 30px; max-width: 30px;
-}
-td:nth-child(2), thead th:nth-child(2) {
-  position: sticky; left: 30px; z-index: 3;
-  min-width: 60px; max-width: 60px;
-}
-td:nth-child(3), thead th:nth-child(3) {
-  position: sticky; left: 90px; z-index: 3;
-  min-width: 150px; max-width: 150px;
-  border-right: 2px solid #334155;
-  box-shadow: 4px 0 8px -2px rgba(0,0,0,0.25);
-}
-td:nth-child(1), td:nth-child(2), td:nth-child(3) { background: var(--surface); }
-tr.cat-equity      td:nth-child(1),
-tr.cat-equity      td:nth-child(2),
-tr.cat-equity      td:nth-child(3) { background: var(--eq-bg); }
-tr.cat-bond        td:nth-child(1),
-tr.cat-bond        td:nth-child(2),
-tr.cat-bond        td:nth-child(3) { background: var(--bd-bg); }
-tr.cat-target_date td:nth-child(1),
-tr.cat-target_date td:nth-child(2),
-tr.cat-target_date td:nth-child(3) { background: var(--td-bg); }
-tr.cat-balanced    td:nth-child(1),
-tr.cat-balanced    td:nth-child(2),
-tr.cat-balanced    td:nth-child(3) { background: var(--bl-bg); }
-tbody tr:hover td:nth-child(1),
-tbody tr:hover td:nth-child(2),
-tbody tr:hover td:nth-child(3) { background: #f0f7ff !important; }
-thead th:nth-child(1),
-thead th:nth-child(2),
-thead th:nth-child(3) { background: #1e2d45; z-index: 7; }
 
 </style>
 </head>
