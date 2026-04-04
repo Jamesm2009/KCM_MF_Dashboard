@@ -218,6 +218,45 @@ td.bar-cell { min-width: 160px; padding: 4px 8px; }
 .col-hidden { display: none; }
 
 footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 4px; background: var(--surface); }
+
+/* ── Sticky first 3 columns ── */
+td:nth-child(1), thead th:nth-child(1) {
+  position: sticky; left: 0; z-index: 3;
+  min-width: 32px; max-width: 32px; width: 32px;
+}
+td:nth-child(2), thead th:nth-child(2) {
+  position: sticky; left: 32px; z-index: 3;
+  min-width: 68px; max-width: 68px; width: 68px;
+}
+td:nth-child(3), thead th:nth-child(3) {
+  position: sticky; left: 100px; z-index: 3;
+  min-width: 160px; max-width: 160px; width: 160px;
+  border-right: 2px solid var(--border);
+}
+/* Background for sticky cells must match row color */
+tr.cat-equity      td:nth-child(1),
+tr.cat-equity      td:nth-child(2),
+tr.cat-equity      td:nth-child(3) { background: var(--eq-bg); }
+tr.cat-bond        td:nth-child(1),
+tr.cat-bond        td:nth-child(2),
+tr.cat-bond        td:nth-child(3) { background: var(--bd-bg); }
+tr.cat-target_date td:nth-child(1),
+tr.cat-target_date td:nth-child(2),
+tr.cat-target_date td:nth-child(3) { background: var(--td-bg); }
+tr.cat-balanced    td:nth-child(1),
+tr.cat-balanced    td:nth-child(2),
+tr.cat-balanced    td:nth-child(3) { background: var(--bl-bg); }
+tbody tr:hover td:nth-child(1),
+tbody tr:hover td:nth-child(2),
+tbody tr:hover td:nth-child(3) { background: #f0f7ff !important; }
+thead th:nth-child(1),
+thead th:nth-child(2),
+thead th:nth-child(3) { background: #1e2d45; z-index: 6; }
+/* shadow to indicate frozen columns */
+td:nth-child(3), thead th:nth-child(3) {
+  box-shadow: 3px 0 6px -2px rgba(0,0,0,0.15);
+}
+
 </style>
 </head>
 <body>
@@ -302,7 +341,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
   <span><span class="flag-dot dot-gr"></span> At avg</span>
   <span><span class="flag-dot dot-r"></span> Below avg</span>
   &nbsp;|&nbsp;
-  <b>Trade</b> = 21-day SMA &nbsp; <b>Trend</b> = 63-day SMA &nbsp;|&nbsp;
+  <b>1M Trend</b> = 21-day SMA &nbsp; <b>3M Trend</b> = 63-day SMA &nbsp;|&nbsp;
   <b>Fund Types:</b>
   <span class="cat-chip chip-eq">Equity</span>
   <span class="cat-chip chip-bd">Bond</span>
@@ -352,8 +391,8 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
       <th onclick="sortTable(14)" data-col="14" class="col-hidden rs-col">RS Score</th>
       <th onclick="sortTable(15)" data-col="15" class="col-hidden zsc-col">Z-Score</th>
       <th onclick="sortTable(16)" data-col="16" class="col-hidden obos-col">OB / OS</th>
-      <th onclick="sortTable(17)" data-col="17">Trade</th>
-      <th onclick="sortTable(18)" data-col="18">Trend</th>
+      <th onclick="sortTable(17)" data-col="17">1M Trend</th>
+      <th onclick="sortTable(18)" data-col="18">3M Trend</th>
     </tr>
   </thead>
   <tbody>
@@ -428,12 +467,12 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
     </td>
 
     <!-- Trade flag -->
-    <td class="flag-cell" title="Trade: vs 21-day SMA">
+    <td class="flag-cell" title="1M Trend: vs 21-day SMA">
       <span class="fc fc-{{ f.trade_flag }}"></span>
     </td>
 
     <!-- Trend flag -->
-    <td class="flag-cell" title="Trend: vs 63-day SMA">
+    <td class="flag-cell" title="3M Trend: vs 63-day SMA">
       <span class="fc fc-{{ f.trend_flag }}"></span>
     </td>
 
