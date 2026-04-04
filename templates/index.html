@@ -1,14 +1,14 @@
 {% macro pct_cell(v) %}
   {% if v is none %}<td class="num na">—</td>
   {% elif v == 0 %}<td class="num zero">0.00%</td>
-  {% elif v >= 5  %}<td class="num p3">+{{ '%.2f'|format(v) }}%</td>
-  {% elif v >= 2  %}<td class="num p2">+{{ '%.2f'|format(v) }}%</td>
-  {% elif v >= 0.5%}<td class="num p1">+{{ '%.2f'|format(v) }}%</td>
-  {% elif v > 0   %}<td class="num p0">+{{ '%.2f'|format(v) }}%</td>
-  {% elif v > -0.5%}<td class="num n0">{{ '%.2f'|format(v) }}%</td>
-  {% elif v > -2  %}<td class="num n1">{{ '%.2f'|format(v) }}%</td>
-  {% elif v > -5  %}<td class="num n2">{{ '%.2f'|format(v) }}%</td>
-  {% else         %}<td class="num n3">{{ '%.2f'|format(v) }}%</td>
+  {% elif v >= 5  %}<td class="num p3">+{{ '%.1f'|format(v) }}%</td>
+  {% elif v >= 2  %}<td class="num p2">+{{ '%.1f'|format(v) }}%</td>
+  {% elif v >= 0.5%}<td class="num p1">+{{ '%.1f'|format(v) }}%</td>
+  {% elif v > 0   %}<td class="num p0">+{{ '%.1f'|format(v) }}%</td>
+  {% elif v > -0.5%}<td class="num n0">{{ '%.1f'|format(v) }}%</td>
+  {% elif v > -2  %}<td class="num n1">{{ '%.1f'|format(v) }}%</td>
+  {% elif v > -5  %}<td class="num n2">{{ '%.1f'|format(v) }}%</td>
+  {% else         %}<td class="num n3">{{ '%.1f'|format(v) }}%</td>
   {% endif %}
 {% endmacro %}
 
@@ -51,7 +51,7 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 12.5px; }
+body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 13.5px; }
 
 /* ── Header ── */
 header {
@@ -135,8 +135,8 @@ table { border-collapse: collapse; min-width: 1100px; width: 100%; background: v
 
 thead th {
   background: #1e2d45; color: #93c5fd;
-  font-size: 10.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
-  padding: 7px 8px; border-bottom: 2px solid #334155;
+  font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase;
+  padding: 6px 5px; border-bottom: 2px solid #334155;
   cursor: pointer; user-select: none; white-space: nowrap;
 }
 thead th:hover { color: #fff; }
@@ -158,15 +158,15 @@ tr.cat-bond        { background: var(--bd-bg); }
 tr.cat-target_date { background: var(--td-bg); }
 tr.cat-balanced    { background: var(--bl-bg); }
 
-td { padding: 5px 8px; white-space: nowrap; vertical-align: middle; }
+td { padding: 4px 5px; white-space: nowrap; vertical-align: middle; }
 
-td.rank   { font-weight: 800; font-size: 14px; color: var(--gold); text-align: center; width: 34px; }
-td.sym a  { font-weight: 700; font-size: 12.5px; font-family: 'Courier New', monospace; color: var(--accent); text-decoration: none; }
+td.rank   { font-weight: 800; font-size: 14px; color: var(--gold); text-align: center; width: 28px; padding: 4px 3px; }
+td.sym a  { font-weight: 700; font-size: 13px; font-family: 'Courier New', monospace; color: var(--accent); text-decoration: none; }
 td.sym a:hover { text-decoration: underline; }
 td.fname  { max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 td.ftype  { font-size: 10px; color: var(--muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 td.spark  { padding: 3px 6px; }
-td.num    { text-align: right; font-variant-numeric: tabular-nums; min-width: 58px; }
+td.num    { text-align: right; font-variant-numeric: tabular-nums; min-width: 46px; }
 td.na     { text-align: right; color: var(--muted); }
 
 /* Performance colors */
@@ -185,7 +185,7 @@ td.na     { text-align: right; color: var(--muted); }
 .fc-green { background: #16a34a; box-shadow: 0 0 4px #16a34a88; }
 .fc-red   { background: #dc2626; box-shadow: 0 0 4px #dc262688; }
 .fc-grey  { background: #d1d5db; }
-td.flag-cell { text-align: center; min-width: 48px; }
+td.flag-cell { text-align: center; min-width: 36px; padding: 4px 3px; }
 
 /* OB/OS pills */
 .pill-ob { background: #fff7ed; color: #c2410c; border: 1px solid #fb923c; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
@@ -201,7 +201,7 @@ td.rs { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums;
 td.zsc { text-align: right; font-variant-numeric: tabular-nums; min-width: 50px; color: var(--muted); }
 
 /* TTM Yield */
-td.ttm { text-align: right; font-variant-numeric: tabular-nums; min-width: 52px; color: #0f766e; font-weight: 600; }
+td.ttm { text-align: right; font-variant-numeric: tabular-nums; min-width: 44px; color: #0f766e; font-weight: 600; }
 
 /* 3-Year price bar */
 td.bar-cell { min-width: 160px; padding: 4px 8px; }
@@ -220,6 +220,47 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 </style>
 </head>
 <body>
+{% if error %}
+<div style="background:#991b1b;color:#fecaca;text-align:center;padding:10px;font-size:13px;font-weight:600;">
+  ⚠ Error: {{ error }}
+</div>
+{% endif %}
+{% if is_loading %}
+<div id="loading-banner" style="background:#1e40af;color:#fff;padding:10px 16px;font-size:12.5px;display:flex;align-items:center;gap:12px;justify-content:center;">
+  <span>⏳</span>
+  <span>
+    {% if phase == 1 %}🔵 Phase 1/3: Loading performance data...
+    {% elif phase == 2 %}🟡 Phase 1 complete! Now loading 3-year price ranges...
+    {% else %}Loading...{% endif %}
+  </span>
+  <span id="prog" style="opacity:.8">{{ progress }}</span>
+  <span id="fcnt" style="opacity:.6;font-size:11px;"></span>
+</div>
+{% elif phase == 2 or phase == 3 %}
+<div id="enrich-banner" style="background:#0f4c81;color:#bfdbfe;padding:6px 16px;font-size:11.5px;text-align:center;">
+  {% if phase == 2 %}🟡 Loading 3-year price range bars in background...
+  {% elif phase == 3 %}🟢 Loading TTM yields in background...
+  {% endif %}
+  <span id="prog2" style="opacity:.7">{{ progress }}</span>
+</div>
+{% endif %}
+<script>
+  (function poll() {
+    setTimeout(function() {
+      fetch('/status').then(r=>r.json()).then(d=>{
+        var p  = document.getElementById('prog') || document.getElementById('prog2');
+        var fc = document.getElementById('fcnt');
+        if(p)  p.textContent  = d.progress || '';
+        if(fc) fc.textContent = d.funds > 0 ? '(' + d.funds + ' funds)' : '';
+        // Reload when phase 1 completes (phase becomes 2) OR when fully done (phase 4)
+        var curPhase = {{ phase }};
+        if (d.phase > curPhase) { location.reload(); }
+        else if (d.phase < 4)   { poll(); }
+      }).catch(()=>{ poll(); });
+    }, 5000);
+  })();
+</script>
+
 
 <!-- ── Header ── -->
 <header>
