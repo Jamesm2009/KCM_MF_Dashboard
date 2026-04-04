@@ -167,7 +167,7 @@ td.sym a:hover { text-decoration: underline; }
 td.fname  { max-width: 200px; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
 td.ftype  { font-size: 10px; color: var(--muted); max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
 td.spark  { padding: 3px 6px; }
-td.num    { text-align: right; font-variant-numeric: tabular-nums; min-width: 46px; }
+td.num    { text-align: right; font-variant-numeric: tabular-nums; }
 td.na     { text-align: right; color: var(--muted); }
 
 /* Performance colors */
@@ -186,7 +186,7 @@ td.na     { text-align: right; color: var(--muted); }
 .fc-green { background: #16a34a; box-shadow: 0 0 4px #16a34a88; }
 .fc-red   { background: #dc2626; box-shadow: 0 0 4px #dc262688; }
 .fc-grey  { background: #d1d5db; }
-td.flag-cell { text-align: center; min-width: 36px; padding: 4px 3px; }
+td.flag-cell { text-align: center; padding: 4px 2px; }
 
 /* OB/OS pills */
 .pill-ob { background: #fff7ed; color: #c2410c; border: 1px solid #fb923c; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 700; }
@@ -220,20 +220,32 @@ td.bar-cell { min-width: 160px; padding: 4px 8px; }
 footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 4px; background: var(--surface); }
 
 /* ── Sticky first 3 columns ── */
+.table-wrap { overflow-x: auto; padding: 10px 8px 24px; }
+table { table-layout: fixed; }
+
+col.c-rank  { width: 32px; }
+col.c-sym   { width: 62px; }
+col.c-name  { width: 155px; }
+col.c-spark { width: 100px; }
+col.c-type  { width: 160px; }
+col.c-perf  { width: 46px; }
+col.c-bar   { width: 175px; }
+col.c-ttm   { width: 52px; }
+col.c-flag  { width: 34px; }
+
 td:nth-child(1), thead th:nth-child(1) {
-  position: sticky; left: 0; z-index: 3;
-  min-width: 32px; max-width: 32px; width: 32px;
+  position: sticky; left: 0; z-index: 3; width: 32px;
 }
 td:nth-child(2), thead th:nth-child(2) {
-  position: sticky; left: 32px; z-index: 3;
-  min-width: 68px; max-width: 68px; width: 68px;
+  position: sticky; left: 32px; z-index: 3; width: 62px;
 }
 td:nth-child(3), thead th:nth-child(3) {
-  position: sticky; left: 100px; z-index: 3;
-  min-width: 160px; max-width: 160px; width: 160px;
-  border-right: 2px solid var(--border);
+  position: sticky; left: 94px; z-index: 3; width: 155px;
+  border-right: 2px solid #334155;
+  box-shadow: 3px 0 8px -2px rgba(0,0,0,0.18);
 }
-/* Background for sticky cells must match row color */
+/* Default white bg so sticky cols don't show through */
+td:nth-child(1), td:nth-child(2), td:nth-child(3) { background: var(--surface); }
 tr.cat-equity      td:nth-child(1),
 tr.cat-equity      td:nth-child(2),
 tr.cat-equity      td:nth-child(3) { background: var(--eq-bg); }
@@ -251,11 +263,7 @@ tbody tr:hover td:nth-child(2),
 tbody tr:hover td:nth-child(3) { background: #f0f7ff !important; }
 thead th:nth-child(1),
 thead th:nth-child(2),
-thead th:nth-child(3) { background: #1e2d45; z-index: 6; }
-/* shadow to indicate frozen columns */
-td:nth-child(3), thead th:nth-child(3) {
-  box-shadow: 3px 0 6px -2px rgba(0,0,0,0.15);
-}
+thead th:nth-child(3) { background: #1e2d45; z-index: 7; }
 
 </style>
 </head>
@@ -341,7 +349,7 @@ td:nth-child(3), thead th:nth-child(3) {
   <span><span class="flag-dot dot-gr"></span> At avg</span>
   <span><span class="flag-dot dot-r"></span> Below avg</span>
   &nbsp;|&nbsp;
-  <b>1M Trend</b> = 21-day SMA &nbsp; <b>3M Trend</b> = 63-day SMA &nbsp;|&nbsp;
+  <b>±1M</b> = 21-day SMA &nbsp; <b>±3M</b> = 63-day SMA &nbsp;|&nbsp;
   <b>Fund Types:</b>
   <span class="cat-chip chip-eq">Equity</span>
   <span class="cat-chip chip-bd">Bond</span>
@@ -391,8 +399,8 @@ td:nth-child(3), thead th:nth-child(3) {
       <th onclick="sortTable(14)" data-col="14" class="col-hidden rs-col">RS Score</th>
       <th onclick="sortTable(15)" data-col="15" class="col-hidden zsc-col">Z-Score</th>
       <th onclick="sortTable(16)" data-col="16" class="col-hidden obos-col">OB / OS</th>
-      <th onclick="sortTable(17)" data-col="17">1M Trend</th>
-      <th onclick="sortTable(18)" data-col="18">3M Trend</th>
+      <th onclick="sortTable(17)" data-col="17">±1M</th>
+      <th onclick="sortTable(18)" data-col="18">±3M</th>
     </tr>
   </thead>
   <tbody>
