@@ -1,7 +1,7 @@
 """
 Fund Performance Dashboard — Tiingo, single-phase loader
 One API call per fund (3y history), computes everything from it.
-Total requests: 35 funds + 1 VIX proxy = 36/update (under 50/hr limit)
+Total requests: 35 funds + 2 VIX proxies = 37/update (under 50/hr limit)
 RS Score: (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40)
 """
 
@@ -11,7 +11,10 @@ import pandas as pd
 import threading
 import time
 from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
 import json, os
+
+CT = ZoneInfo("America/Chicago")
 
 app = Flask(__name__)
 
@@ -33,23 +36,28 @@ def load_funds():
 
 # ── Tiingo fetch (single call, 3y) ────────────────────────────────────────────
 
-def tiingo_history(symbol, years=3, retries=3):
+def tiingo_history(symbol, years=3):
     if not TIINGO_TOKEN:
         raise ValueError("TIINGO_TOKEN not set")
     start  = (date.today() - timedelta(days=int(365*years+10))).strftime("%Y-%m-%d")
     url    = f"{TIINGO_BASE}/{symbol}/prices"
     params = {"startDate": start, "token": TIINGO_TOKEN, "resampleFreq": "daily"}
 
-    for attempt in range(retries):
+    while True:
         try:
             r = requests.get(url, params=params, timeout=30)
             if r.status_code == 429:
-                wait = 70 * (attempt + 1)
-                print(f"    429 {symbol} — waiting {wait}s")
+                # Wait until 2 minutes past the next hour boundary
+                now        = datetime.now(CT)
+                next_hour  = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+                wait_secs  = int((next_hour - now).total_seconds()) + 120
+                resume_at  = (datetime.now(CT) + timedelta(seconds=wait_secs)).strftime("%H:%M")
+                msg = f"Rate limit — pausing until {resume_at} CT ({wait_secs//60} min)"
+                print(f"    429 {symbol} — {msg}")
                 with _lock:
-                    cache["progress"] = f"Rate limit hit — waiting {wait}s then resuming..."
-                time.sleep(wait)
-                continue
+                    cache["progress"] = msg
+                time.sleep(wait_secs)
+                continue   # retry same symbol after waiting
             if r.status_code == 404:
                 return None
             r.raise_for_status()
@@ -60,9 +68,8 @@ def tiingo_history(symbol, years=3, retries=3):
             df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None)
             return df.set_index("date").sort_index()
         except requests.exceptions.Timeout:
-            print(f"    timeout {symbol} attempt {attempt+1}")
-            time.sleep(5)
-    return None
+            print(f"    timeout {symbol} — retrying in 10s")
+            time.sleep(10)
 
 
 # ── Calc helpers ──────────────────────────────────────────────────────────────
@@ -152,18 +159,26 @@ def rebuild_ranked():
     cache["ranked"] = scored + unscored
 
 
-# ── VIX proxy (VIXY ETF short vs longer SMA) ─────────────────────────────────
+# ── VIX signal: VIXY (short-term) vs VXX (medium-term) last close ───────────
 
 def fetch_vix():
+    """
+    VIXY = ProShares VIX Short-Term Futures ETF  (VIX9D proxy)
+    VXX  = iPath S&P 500 VIX Short-Term Futures  (VIX proxy)
+    Shows actual last closing prices.
+    Risk OFF = VIXY > VXX (short-term fear > medium-term)
+    Risk ON  = VIXY < VXX
+    """
     try:
-        df = tiingo_history("VIXY", years=0.5)
-        if df is None or df.empty:
+        df_vixy = tiingo_history("VIXY", years=0.1)
+        time.sleep(3)
+        df_vxx  = tiingo_history("VXX",  years=0.1)
+        if df_vixy is None or df_vxx is None or df_vixy.empty or df_vxx.empty:
             return "grey", "—", "—"
-        c    = df["adjClose"].dropna()
-        sma5 = round(c.tail(5).mean(),  2)
-        sma21= round(c.tail(21).mean(), 2)
-        sig  = "grey" if abs(sma5-sma21) < 0.05 else ("red" if sma5 > sma21 else "green")
-        return sig, sma5, sma21
+        v9  = round(df_vixy["adjClose"].dropna().iloc[-1], 2)
+        vix = round(df_vxx["adjClose"].dropna().iloc[-1],  2)
+        sig = "grey" if abs(v9 - vix) < 0.10 else ("red" if v9 > vix else "green")
+        return sig, v9, vix
     except Exception as e:
         print(f"  VIX error: {e}")
         return "grey", "—", "—"
@@ -254,7 +269,7 @@ def run_update():
                         "rank": None,
                     }
                     rebuild_ranked()
-                    cache["last_updated"] = datetime.now().strftime("%-m/%-d/%y %H:%M ET")
+                    cache["last_updated"] = datetime.now(CT).strftime("%-m/%-d/%y %H:%M CT")
 
                 print(f"    OK  rs={'%.2f'%rs if rs else 'n/a'}")
 
@@ -274,7 +289,7 @@ def run_update():
             cache["vix_value"]   = vi
             cache["phase"]       = 4
             cache["progress"]    = "Complete"
-            cache["last_updated"]= datetime.now().strftime("%-m/%-d/%y %H:%M ET")
+            cache["last_updated"]= datetime.now(CT).strftime("%-m/%-d/%y %H:%M CT")
 
         print(f"Done — {len(cache['data'])} funds, VIX={sig}")
 
