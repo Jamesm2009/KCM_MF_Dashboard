@@ -1,11 +1,8 @@
 """
-Fund Performance Dashboard — Tiingo data source
-3-phase sequential loader:
-  Phase 1: 13-month history  → performance, RS rank, flags, z-score, sparkline
-  Phase 2: 3-year history    → price range bar + TTM yield from dividends
-  Phase 3: VIX comparison    → Risk On/Off signal
+Fund Performance Dashboard — Tiingo, single-phase loader
+One API call per fund (3y history), computes everything from it.
+Total requests: 35 funds + 1 VIX proxy = 36/update (under 50/hr limit)
 RS Score: (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40)
-Set env var TIINGO_TOKEN with your free token from tiingo.com
 """
 
 from flask import Flask, render_template, jsonify
@@ -20,7 +17,6 @@ app = Flask(__name__)
 
 TIINGO_TOKEN = os.environ.get("TIINGO_TOKEN", "")
 TIINGO_BASE  = "https://api.tiingo.com/tiingo/daily"
-TIINGO_IEX   = "https://api.tiingo.com/iex"
 
 cache = {
     "data": {}, "ranked": [], "last_updated": "Loading...",
@@ -35,61 +31,38 @@ def load_funds():
         return json.load(f)
 
 
-# ── Tiingo fetch ──────────────────────────────────────────────────────────────
+# ── Tiingo fetch (single call, 3y) ────────────────────────────────────────────
 
-def tiingo_history(symbol, years=1):
-    """Return a DataFrame with adjClose and divCash indexed by date."""
+def tiingo_history(symbol, years=3, retries=3):
     if not TIINGO_TOKEN:
-        raise ValueError("TIINGO_TOKEN environment variable not set")
-    start = (date.today() - timedelta(days=int(365 * years + 10))).strftime("%Y-%m-%d")
-    url   = f"{TIINGO_BASE}/{symbol}/prices"
+        raise ValueError("TIINGO_TOKEN not set")
+    start  = (date.today() - timedelta(days=int(365*years+10))).strftime("%Y-%m-%d")
+    url    = f"{TIINGO_BASE}/{symbol}/prices"
     params = {"startDate": start, "token": TIINGO_TOKEN, "resampleFreq": "daily"}
-    r = requests.get(url, params=params, timeout=30)
-    if r.status_code == 404:
-        return None
-    r.raise_for_status()
-    data = r.json()
-    if not data:
-        return None
-    df = pd.DataFrame(data)
-    df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None)
-    df = df.set_index("date").sort_index()
-    return df
 
-
-def tiingo_quote(symbol):
-    """Return latest quote dict from Tiingo IEX endpoint."""
-    url    = f"{TIINGO_IEX}/{symbol}"
-    params = {"token": TIINGO_TOKEN}
-    r = requests.get(url, params=params, timeout=15)
-    if r.status_code != 200:
-        return None
-    data = r.json()
-    return data[0] if data else None
-
-
-def fetch_vix():
-    """
-    Tiingo doesn't carry VIX directly. We use ^VIX proxies:
-    VIXY (ProShares VIX Short-Term) as Risk-Off proxy and
-    fetch both with tiingo_history and compare short vs longer SMA.
-    Or we simply compare VIXY 5d vs 21d SMA as a risk signal.
-    """
-    try:
-        df = tiingo_history("VIXY", years=0.25)  # VIX short-term ETF
-        if df is None or df.empty:
-            return "grey", "—", "—"
-        c = df["adjClose"].dropna()
-        if len(c) < 10:
-            return "grey", "—", "—"
-        sma5  = round(c.tail(5).mean(),  2)
-        sma21 = round(c.tail(21).mean(), 2)
-        # sma5 > sma21 means short-term volatility rising → Risk Off
-        sig = "grey" if abs(sma5 - sma21) < 0.1 else ("red" if sma5 > sma21 else "green")
-        return sig, round(sma5, 2), round(sma21, 2)
-    except Exception as e:
-        print(f"  VIX proxy error: {e}")
-        return "grey", "—", "—"
+    for attempt in range(retries):
+        try:
+            r = requests.get(url, params=params, timeout=30)
+            if r.status_code == 429:
+                wait = 70 * (attempt + 1)
+                print(f"    429 {symbol} — waiting {wait}s")
+                with _lock:
+                    cache["progress"] = f"Rate limit hit — waiting {wait}s then resuming..."
+                time.sleep(wait)
+                continue
+            if r.status_code == 404:
+                return None
+            r.raise_for_status()
+            data = r.json()
+            if not data:
+                return None
+            df = pd.DataFrame(data)
+            df["date"] = pd.to_datetime(df["date"]).dt.tz_localize(None)
+            return df.set_index("date").sort_index()
+        except requests.exceptions.Timeout:
+            print(f"    timeout {symbol} attempt {attempt+1}")
+            time.sleep(5)
+    return None
 
 
 # ── Calc helpers ──────────────────────────────────────────────────────────────
@@ -149,13 +122,14 @@ def make_sparkline(closes, days=170, w=90, h=28):
             f'</svg>')
 
 
-def calc_ttm_yield(df):
-    """Sum dividends over last 12 months divided by current price."""
+def calc_ttm_yield(df, closes):
     try:
-        cutoff   = df.index[-1] - pd.Timedelta(days=365)
-        last_yr  = df[df.index >= cutoff]
-        ttm_div  = last_yr["divCash"].sum()
-        cur_px   = df["adjClose"].dropna().iloc[-1]
+        cutoff  = closes.index[-1] - pd.Timedelta(days=365)
+        div_col = "divCash" if "divCash" in df.columns else None
+        if not div_col:
+            return None
+        ttm_div = df[div_col][df.index >= cutoff].sum()
+        cur_px  = closes.iloc[-1]
         if ttm_div > 0 and cur_px > 0:
             return round(ttm_div / cur_px * 100, 2)
     except Exception:
@@ -175,159 +149,132 @@ def rebuild_ranked():
     cache["ranked"] = scored + unscored
 
 
-# ── Phase 1: 13-month performance ─────────────────────────────────────────────
+# ── VIX proxy (VIXY ETF short vs longer SMA) ─────────────────────────────────
 
-def phase1(funds):
-    print("=== PHASE 1: 13-month performance ===")
-    for i, fund in enumerate(funds):
-        ticker   = fund["symbol"]
-        name     = fund.get("name", ticker)
-        category = fund.get("category", "equity")
-        ftype    = fund.get("type", "")
-        ms_url   = fund.get("morningstar_url",
-                   f"https://www.morningstar.com/search#q={ticker}")
-
-        with _lock:
-            cache["progress"] = f"Phase 1 — {i+1}/{len(funds)}: {ticker}"
-        print(f"  P1 [{i+1}/{len(funds)}] {ticker}")
-
-        try:
-            df = tiingo_history(ticker, years=1.1)
-            if df is None or df.empty:
-                print(f"    skip — no data")
-                continue
-
-            closes = df["adjClose"].dropna()
-            if len(closes) < 10:
-                continue
-
-            d1  = period_return(closes, 1)
-            w1  = period_return(closes, 7)
-            m1  = period_return(closes, 30)
-            m3  = period_return(closes, 91)
-            m6  = period_return(closes, 182)
-            ytd = ytd_return(closes)
-            y1  = period_return(closes, 365)
-
-            rs = None
-            if all(v is not None for v in [d1, w1, m1, m3]):
-                rs = (d1*0.10) + (w1*0.20) + (m1*0.30) + (m3*0.40)
-
-            zsc   = zscore_1yr(closes)
-            ob_os = ("Overbought" if zsc and zsc > 2.10
-                     else "Oversold" if zsc and zsc < -2.05 else "")
-
-            def fmt(v): return round(v, 2) if v is not None else None
-
-            row = {
-                "symbol": ticker, "name": name, "type": ftype,
-                "category": category, "morningstar_url": ms_url,
-                "sparkline":   make_sparkline(closes),
-                "1D": fmt(d1), "1W": fmt(w1), "1M": fmt(m1),
-                "3M": fmt(m3), "6M": fmt(m6), "YTD": fmt(ytd), "1Y": fmt(y1),
-                "rs_score":   round(rs, 3) if rs is not None else None,
-                "zscore": zsc, "ob_os": ob_os,
-                "trade_flag": sma_flag(closes, 21),
-                "trend_flag": sma_flag(closes, 63),
-                "low3": None, "high3": None, "last_price": None,
-                "bar_pct": None, "ttm_yield": None, "rank": None,
-            }
-            with _lock:
-                cache["data"][ticker] = row
-                rebuild_ranked()
-            print(f"    OK  rs={'%.2f'%rs if rs else 'n/a'}")
-
-        except Exception as e:
-            print(f"    ERR: {e}")
-
-        time.sleep(1.5)  # stay within Tiingo free tier rate limit
-
-    with _lock:
-        cache["phase"]        = 2
-        cache["last_updated"] = datetime.now().strftime("%-m/%-d/%y %H:%M ET")
-    print(f"Phase 1 done — {len(cache['data'])} funds loaded")
+def fetch_vix():
+    try:
+        df = tiingo_history("VIXY", years=0.5)
+        if df is None or df.empty:
+            return "grey", "—", "—"
+        c    = df["adjClose"].dropna()
+        sma5 = round(c.tail(5).mean(),  2)
+        sma21= round(c.tail(21).mean(), 2)
+        sig  = "grey" if abs(sma5-sma21) < 0.05 else ("red" if sma5 > sma21 else "green")
+        return sig, sma5, sma21
+    except Exception as e:
+        print(f"  VIX error: {e}")
+        return "grey", "—", "—"
 
 
-# ── Phase 2: 3-year bar + TTM yield ──────────────────────────────────────────
-
-def phase2(funds):
-    print("=== PHASE 2: 3yr bar + TTM yield ===")
-    for i, fund in enumerate(funds):
-        ticker = fund["symbol"]
-        if ticker not in cache["data"]:
-            continue
-
-        with _lock:
-            cache["progress"] = f"Phase 2 — {i+1}/{len(funds)}: {ticker}"
-        print(f"  P2 [{i+1}/{len(funds)}] {ticker}")
-
-        try:
-            df = tiingo_history(ticker, years=3)
-            if df is None or df.empty:
-                continue
-            c  = df["adjClose"].dropna()
-            if len(c) < 2:
-                continue
-            lo   = round(c.min(), 2)
-            hi   = round(c.max(), 2)
-            last = round(c.iloc[-1], 2)
-            pct  = round((last-lo)/(hi-lo)*100, 1) if hi > lo else 50.0
-            ttm  = calc_ttm_yield(df)
-
-            with _lock:
-                cache["data"][ticker].update({
-                    "low3": lo, "high3": hi, "last_price": last,
-                    "bar_pct": pct, "ttm_yield": ttm,
-                })
-                rebuild_ranked()
-            print(f"    OK  lo={lo} hi={hi} ttm={ttm}")
-
-        except Exception as e:
-            print(f"    ERR: {e}")
-
-        time.sleep(1.5)  # rate limit
-
-    with _lock:
-        cache["phase"]        = 3
-        cache["last_updated"] = datetime.now().strftime("%-m/%-d/%y %H:%M ET")
-    print("Phase 2 done")
-
-
-# ── Phase 3: VIX risk signal ──────────────────────────────────────────────────
-
-def phase3():
-    print("=== PHASE 3: VIX risk signal ===")
-    with _lock:
-        cache["progress"] = "Phase 3 — fetching VIX risk signal..."
-    sig, v9, vi = fetch_vix()
-    with _lock:
-        cache["vix_signal"]   = sig
-        cache["vix9d_value"]  = v9
-        cache["vix_value"]    = vi
-        cache["phase"]        = 4
-        cache["last_updated"] = datetime.now().strftime("%-m/%-d/%y %H:%M ET")
-        cache["progress"]     = "All phases complete"
-    print(f"Phase 3 done — VIX signal={sig}")
-
-
-# ── Orchestrator ──────────────────────────────────────────────────────────────
+# ── Main update (single phase) ────────────────────────────────────────────────
 
 def run_update():
     with _lock:
         cache["phase"]    = 1
-        cache["progress"] = "Starting Phase 1..."
+        cache["progress"] = "Waiting 15s before starting..."
         cache["error"]    = None
+
+    time.sleep(15)   # let any previous rate-limit window breathe
+
     try:
         if not TIINGO_TOKEN:
             with _lock:
-                cache["error"]   = "TIINGO_TOKEN not set. Add it in Render → Environment."
-                cache["phase"]   = 4
-                cache["loading"] = False
+                cache["error"] = "TIINGO_TOKEN not set in Render Environment."
+                cache["phase"] = 4
             return
+
         funds = load_funds()
-        phase1(funds)
-        phase2(funds)
-        phase3()
+        total = len(funds)
+
+        for i, fund in enumerate(funds):
+            ticker   = fund["symbol"]
+            name     = fund.get("name", ticker)
+            category = fund.get("category", "equity")
+            ftype    = fund.get("type", "")
+            ms_url   = fund.get("morningstar_url",
+                       f"https://www.morningstar.com/search#q={ticker}")
+
+            with _lock:
+                cache["progress"] = f"Loading {i+1}/{total}: {ticker}"
+            print(f"  [{i+1}/{total}] {ticker}")
+
+            try:
+                df = tiingo_history(ticker, years=3)
+                if df is None or df.empty:
+                    print(f"    skip — no data")
+                    time.sleep(3)
+                    continue
+
+                closes = df["adjClose"].dropna()
+                if len(closes) < 30:
+                    print(f"    skip — too few rows")
+                    time.sleep(3)
+                    continue
+
+                def fmt(v): return round(v, 2) if v is not None else None
+
+                d1  = period_return(closes, 1)
+                w1  = period_return(closes, 7)
+                m1  = period_return(closes, 30)
+                m3  = period_return(closes, 91)
+                m6  = period_return(closes, 182)
+                ytd = ytd_return(closes)
+                y1  = period_return(closes, 365)
+
+                rs = None
+                if all(v is not None for v in [d1, w1, m1, m3]):
+                    rs = (d1*0.10)+(w1*0.20)+(m1*0.30)+(m3*0.40)
+
+                zsc   = zscore_1yr(closes)
+                ob_os = ("Overbought" if zsc and zsc > 2.10
+                         else "Oversold" if zsc and zsc < -2.05 else "")
+
+                lo   = round(closes.min(), 2)
+                hi   = round(closes.max(), 2)
+                last = round(closes.iloc[-1], 2)
+                pct  = round((last-lo)/(hi-lo)*100, 1) if hi > lo else 50.0
+
+                with _lock:
+                    cache["data"][ticker] = {
+                        "symbol": ticker, "name": name,
+                        "type": ftype, "category": category,
+                        "morningstar_url": ms_url,
+                        "sparkline":   make_sparkline(closes),
+                        "1D": fmt(d1), "1W": fmt(w1), "1M": fmt(m1),
+                        "3M": fmt(m3), "6M": fmt(m6), "YTD": fmt(ytd), "1Y": fmt(y1),
+                        "rs_score":   round(rs, 3) if rs is not None else None,
+                        "zscore": zsc, "ob_os": ob_os,
+                        "trade_flag": sma_flag(closes, 21),
+                        "trend_flag": sma_flag(closes, 63),
+                        "low3": lo, "high3": hi, "last_price": last, "bar_pct": pct,
+                        "ttm_yield":  calc_ttm_yield(df, closes),
+                        "rank": None,
+                    }
+                    rebuild_ranked()
+                    cache["last_updated"] = datetime.now().strftime("%-m/%-d/%y %H:%M ET")
+
+                print(f"    OK  rs={'%.2f'%rs if rs else 'n/a'}")
+
+            except Exception as e:
+                print(f"    ERR {ticker}: {e}")
+
+            time.sleep(3)   # ~20 requests/min — well under 50/hr
+
+        # VIX
+        with _lock:
+            cache["progress"] = f"Loading VIX signal..."
+        sig, v9, vi = fetch_vix()
+
+        with _lock:
+            cache["vix_signal"]  = sig
+            cache["vix9d_value"] = v9
+            cache["vix_value"]   = vi
+            cache["phase"]       = 4
+            cache["progress"]    = "Complete"
+            cache["last_updated"]= datetime.now().strftime("%-m/%-d/%y %H:%M ET")
+
+        print(f"Done — {len(cache['data'])} funds, VIX={sig}")
+
     except Exception as e:
         import traceback; traceback.print_exc()
         with _lock:
@@ -346,9 +293,9 @@ trigger_update()
 @app.route("/")
 def index():
     with _lock:
-        snap = dict(cache)
+        snap  = dict(cache)
         funds = list(snap["ranked"])
-    is_loading = snap["phase"] < 2 or len(funds) == 0
+    is_loading = snap["phase"] < 4 or len(funds) == 0
     return render_template("index.html",
         funds=funds, last_updated=snap["last_updated"],
         vix_signal=snap["vix_signal"], vix9d=snap["vix9d_value"],
@@ -360,7 +307,7 @@ def index():
 @app.route("/refresh")
 def refresh():
     trigger_update()
-    return jsonify({"status": "refresh started"})
+    return jsonify({"status": "refresh started — check /status for progress"})
 
 
 @app.route("/status")
@@ -377,17 +324,15 @@ def status():
 
 @app.route("/test")
 def test():
-    """Visit /test to verify Tiingo connectivity."""
     if not TIINGO_TOKEN:
-        return jsonify({"status": "error", "detail": "TIINGO_TOKEN not set in environment"})
+        return jsonify({"status": "error", "detail": "TIINGO_TOKEN not set"})
     try:
-        df = tiingo_history("VFIAX", years=0.05)
-        if df is None:
-            return jsonify({"status": "ticker not found on Tiingo"})
-        if df.empty:
-            return jsonify({"status": "empty response"})
-        last = round(df["adjClose"].dropna().iloc[-1], 2)
-        return jsonify({"status": "ok", "VFIAX_last_close": last, "rows": len(df)})
+        df = tiingo_history("VFIAX", years=0.02)
+        if df is None:  return jsonify({"status": "not found"})
+        if df.empty:    return jsonify({"status": "empty"})
+        return jsonify({"status": "ok",
+                        "VFIAX_last_close": round(df["adjClose"].dropna().iloc[-1], 2),
+                        "rows": len(df)})
     except Exception as e:
         return jsonify({"status": "error", "detail": str(e)})
 
