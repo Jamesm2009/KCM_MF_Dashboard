@@ -1,7 +1,7 @@
 """
 Fund Performance Dashboard — Tiingo, single-phase loader
 One API call per fund (3y history), computes everything from it.
-Total requests: 35 funds + 2 VIX proxies = 37/update (under 50/hr limit)
+Total requests: 35 funds + 2 VIX proxies = 37/update. TTM yield from funds.json (update monthly).
 RS Score: (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40)
 """
 
@@ -132,15 +132,6 @@ def make_sparkline(closes, days=170, w=90, h=28):
             f'</svg>')
 
 
-def calc_ttm_yield(df):
-    """
-    Calculate TTM yield using unadjusted close price (not adjClose).
-    Filters out large capital gains distributions (typically >> regular dividends)
-    to match Morningstar's TTM Yield which counts only income dividends.
-    """
-    try:
-        if "divCash" not in df.columns or "close" not in df.columns:
-            return None
         cutoff   = df.index[-1] - pd.Timedelta(days=365)
         divs     = df["divCash"][df.index >= cutoff]
         divs     = divs[divs > 0]   # drop zero rows
@@ -280,7 +271,7 @@ def run_update():
                         "trade_flag": sma_flag(closes, 21),
                         "trend_flag": sma_flag(closes, 63),
                         "low3": lo, "high3": hi, "last_price": last, "bar_pct": pct,
-                        "ttm_yield":  calc_ttm_yield(df),
+                        "ttm_yield":  fund.get("ttm_yield", None),
                         "rank": None,
                     }
                     rebuild_ranked()
