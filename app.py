@@ -1,6 +1,7 @@
 """
-Fund Performance Dashboard — Tiingo data source
-File-based cache survives Render free-tier spindowns.
+Fund Performance Dashboard — Tiingo + Upstash Redis cache
+Redis cache survives Render spindowns and is shared across all browsers/devices.
+Daily refresh via /refresh. Serves from cache instantly on repeat visits.
 RS Score: (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40)
 """
 
@@ -13,12 +14,15 @@ import json, os
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
-app  = Flask(__name__)
-CT   = ZoneInfo("America/Chicago")
+app = Flask(__name__)
+CT  = ZoneInfo("America/Chicago")
 
-TIINGO_TOKEN = os.environ.get("TIINGO_TOKEN", "")
-TIINGO_BASE  = "https://api.tiingo.com/tiingo/daily"
-CACHE_FILE   = "/tmp/mf_cache.json"
+TIINGO_TOKEN  = os.environ.get("TIINGO_TOKEN", "")
+TIINGO_BASE   = "https://api.tiingo.com/tiingo/daily"
+REDIS_URL     = os.environ.get("UPSTASH_REDIS_REST_URL", "")
+REDIS_TOKEN   = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
+REDIS_KEY_MF  = "mf_dashboard_cache"
+REDIS_KEY_PRG = "mf_dashboard_progress"
 
 cache = {
     "data": {}, "ranked": [], "last_updated": "Loading...",
@@ -34,45 +38,104 @@ def load_funds():
         return json.load(f)
 
 
-def save_cache_to_file():
-    try:
-        payload = {
-            "data":         cache["data"],
-            "last_updated": cache["last_updated"],
-            "vix_signal":   cache["vix_signal"],
-            "vix9d_value":  str(cache["vix9d_value"]),
-            "vix_value":    str(cache["vix_value"]),
-            "phase":        cache["phase"],
-        }
-        with open(CACHE_FILE, "w") as f:
-            json.dump(payload, f)
-    except Exception as e:
-        print(f"  Cache save error: {e}")
+# ── Upstash Redis helpers ─────────────────────────────────────────────────────
 
-
-def load_cache_from_file():
+def redis_set(key, value, ex_seconds=90000):
+    """Store JSON value in Redis. ex_seconds=90000 ≈ 25 hours."""
+    if not REDIS_URL or not REDIS_TOKEN:
+        return False
     try:
-        if not os.path.exists(CACHE_FILE):
-            return False
-        with open(CACHE_FILE, "r") as f:
-            payload = json.load(f)
-        cache["data"]         = payload.get("data", {})
-        cache["last_updated"] = payload.get("last_updated", "—")
-        cache["vix_signal"]   = payload.get("vix_signal", "grey")
-        cache["vix9d_value"]  = payload.get("vix9d_value", "—")
-        cache["vix_value"]    = payload.get("vix_value", "—")
-        cache["phase"]        = payload.get("phase", 0)
-        rebuild_ranked()
-        loaded = len(cache["data"])
-        print(f"  Restored {loaded} funds from file cache.")
-        return loaded > 0
+        payload = json.dumps(value)
+        r = requests.post(
+            f"{REDIS_URL}/set/{key}",
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+            json={"value": payload, "ex": ex_seconds},
+            timeout=10
+        )
+        return r.status_code == 200
     except Exception as e:
-        print(f"  Cache load error: {e}")
+        print(f"  Redis SET error: {e}")
         return False
 
 
-def get_completed_symbols():
-    return set(cache["data"].keys())
+def redis_get(key):
+    """Retrieve and parse JSON value from Redis."""
+    if not REDIS_URL or not REDIS_TOKEN:
+        return None
+    try:
+        r = requests.get(
+            f"{REDIS_URL}/get/{key}",
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+            timeout=10
+        )
+        if r.status_code != 200:
+            return None
+        result = r.json().get("result")
+        if result is None:
+            return None
+        return json.loads(result)
+    except Exception as e:
+        print(f"  Redis GET error: {e}")
+        return None
+
+
+def redis_del(key):
+    if not REDIS_URL or not REDIS_TOKEN:
+        return
+    try:
+        requests.post(
+            f"{REDIS_URL}/del/{key}",
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+            timeout=10
+        )
+    except Exception:
+        pass
+
+
+def save_to_redis():
+    """Save full cache to Redis."""
+    payload = {
+        "data":         cache["data"],
+        "last_updated": cache["last_updated"],
+        "vix_signal":   cache["vix_signal"],
+        "vix9d_value":  str(cache["vix9d_value"]),
+        "vix_value":    str(cache["vix_value"]),
+        "phase":        cache["phase"],
+    }
+    ok = redis_set(REDIS_KEY_MF, payload)
+    print(f"  Redis save: {'OK' if ok else 'FAILED'} ({len(cache['data'])} funds)")
+
+
+def load_from_redis():
+    """Restore cache from Redis. Returns True if full cache found."""
+    print("  Checking Redis for cached data...")
+    payload = redis_get(REDIS_KEY_MF)
+    if not payload:
+        print("  No Redis cache found.")
+        return False
+    cache["data"]         = payload.get("data", {})
+    cache["last_updated"] = payload.get("last_updated", "—")
+    cache["vix_signal"]   = payload.get("vix_signal", "grey")
+    cache["vix9d_value"]  = payload.get("vix9d_value", "—")
+    cache["vix_value"]    = payload.get("vix_value", "—")
+    cache["phase"]        = payload.get("phase", 0)
+    rebuild_ranked()
+    n = len(cache["data"])
+    print(f"  Redis restored {n} funds (phase={cache['phase']}).")
+    return n > 0
+
+
+def save_progress(completed_symbols):
+    """Save list of completed symbols so we can resume after spindown."""
+    redis_set(REDIS_KEY_PRG, list(completed_symbols), ex_seconds=90000)
+
+
+def load_progress():
+    """Return set of already-completed symbols."""
+    result = redis_get(REDIS_KEY_PRG)
+    if isinstance(result, list):
+        return set(result)
+    return set()
 
 
 # ── Tiingo ────────────────────────────────────────────────────────────────────
@@ -83,7 +146,6 @@ def tiingo_history(symbol, years=3):
     start  = (date.today() - timedelta(days=int(365*years+10))).strftime("%Y-%m-%d")
     url    = f"{TIINGO_BASE}/{symbol}/prices"
     params = {"startDate": start, "token": TIINGO_TOKEN, "resampleFreq": "daily"}
-
     while True:
         try:
             r = requests.get(url, params=params, timeout=30)
@@ -96,7 +158,7 @@ def tiingo_history(symbol, years=3):
                 print(f"    429 {symbol} — {msg}")
                 with _lock:
                     cache["progress"] = msg
-                    save_cache_to_file()
+                    save_to_redis()
                 time.sleep(wait_secs)
                 continue
             if r.status_code == 404:
@@ -219,18 +281,18 @@ def run_update():
         cache["phase"]  = 1
         cache["error"]  = None
 
-    time.sleep(15)
+    time.sleep(10)
 
     try:
         if not TIINGO_TOKEN:
             with _lock:
-                cache["error"] = "TIINGO_TOKEN not set in Render Environment."
+                cache["error"] = "TIINGO_TOKEN not set."
                 cache["phase"] = 4
             return
 
         funds     = load_funds()
         total     = len(funds)
-        completed = get_completed_symbols()
+        completed = load_progress()
         remaining = [f for f in funds if f["symbol"] not in completed]
 
         if completed:
@@ -247,7 +309,7 @@ def run_update():
                        f"https://www.morningstar.com/search#q={ticker}")
             ttm      = fund.get("ttm_yield", None)
 
-            done_count = len(get_completed_symbols())
+            done_count = len(completed)
             with _lock:
                 cache["progress"] = f"Loading {done_count+1}/{total}: {ticker}"
             print(f"  [{done_count+1}/{total}] {ticker}")
@@ -255,7 +317,7 @@ def run_update():
             try:
                 df = tiingo_history(ticker, years=3)
                 if df is None or df.empty:
-                    print(f"    skip — no data")
+                    print(f"    skip")
                     time.sleep(3)
                     continue
 
@@ -282,26 +344,29 @@ def run_update():
                          else "Oversold" if zsc and zsc < -2.05 else "")
                 lo, hi, last_px, bar_pct = price_bar_data(closes)
 
+                row = {
+                    "symbol": ticker, "name": name,
+                    "type": ftype, "category": category,
+                    "morningstar_url": ms_url,
+                    "sparkline":   make_sparkline(closes),
+                    "1D": fmt(d1), "1W": fmt(w1), "1M": fmt(m1),
+                    "3M": fmt(m3), "6M": fmt(m6), "YTD": fmt(ytd), "1Y": fmt(y1),
+                    "rs_score":   round(rs, 3) if rs is not None else None,
+                    "zscore": zsc, "ob_os": ob_os,
+                    "trade_flag": sma_flag(closes, 21),
+                    "trend_flag": sma_flag(closes, 63),
+                    "low3": lo, "high3": hi, "last_price": last_px, "bar_pct": bar_pct,
+                    "ttm_yield": ttm, "rank": None,
+                }
+
                 with _lock:
-                    cache["data"][ticker] = {
-                        "symbol": ticker, "name": name,
-                        "type": ftype, "category": category,
-                        "morningstar_url": ms_url,
-                        "sparkline":   make_sparkline(closes),
-                        "1D": fmt(d1), "1W": fmt(w1), "1M": fmt(m1),
-                        "3M": fmt(m3), "6M": fmt(m6), "YTD": fmt(ytd), "1Y": fmt(y1),
-                        "rs_score":   round(rs, 3) if rs is not None else None,
-                        "zscore": zsc, "ob_os": ob_os,
-                        "trade_flag": sma_flag(closes, 21),
-                        "trend_flag": sma_flag(closes, 63),
-                        "low3": lo, "high3": hi, "last_price": last_px, "bar_pct": bar_pct,
-                        "ttm_yield": ttm,
-                        "rank": None,
-                    }
+                    cache["data"][ticker] = row
                     rebuild_ranked()
                     cache["last_updated"] = datetime.now(CT).strftime("%-m/%-d/%y %H:%M CT")
-                    save_cache_to_file()
 
+                completed.add(ticker)
+                save_progress(completed)
+                save_to_redis()
                 print(f"    OK")
 
             except Exception as e:
@@ -321,8 +386,10 @@ def run_update():
             cache["phase"]        = 4
             cache["progress"]     = "Complete"
             cache["last_updated"] = datetime.now(CT).strftime("%-m/%-d/%y %H:%M CT")
-            save_cache_to_file()
+            save_to_redis()
 
+        # Clear progress key — full load done
+        redis_del(REDIS_KEY_PRG)
         print(f"Done — {len(cache['data'])} funds loaded.")
 
     except Exception as e:
@@ -340,11 +407,15 @@ def _ensure_started():
     global _started
     if not _started:
         _started = True
-        restored = load_cache_from_file()
+        restored = load_from_redis()
         if restored and cache["phase"] == 4:
-            print("  Full cache restored — skipping reload.")
+            print("  Full cache from Redis — no download needed.")
             with _lock:
-                cache["progress"] = "Restored from cache"
+                cache["progress"] = "Loaded from cache"
+        elif restored and cache["phase"] < 4:
+            # Partial load saved — resume
+            print("  Partial cache found — resuming download.")
+            trigger_update()
         else:
             trigger_update()
 
@@ -368,17 +439,15 @@ def index():
 
 @app.route("/refresh")
 def refresh():
-    try:
-        if os.path.exists(CACHE_FILE):
-            os.remove(CACHE_FILE)
-        with _lock:
-            cache["data"]   = {}
-            cache["ranked"] = []
-            cache["phase"]  = 0
-    except Exception:
-        pass
+    """Force a full fresh download — use once daily after market close."""
+    redis_del(REDIS_KEY_MF)
+    redis_del(REDIS_KEY_PRG)
+    with _lock:
+        cache["data"]   = {}
+        cache["ranked"] = []
+        cache["phase"]  = 0
     trigger_update()
-    return jsonify({"status": "full refresh started"})
+    return jsonify({"status": "full refresh started — check /status for progress"})
 
 
 @app.route("/status")
@@ -392,21 +461,6 @@ def status():
             "last_updated": cache["last_updated"],
             "error":        cache["error"],
         })
-
-
-@app.route("/test")
-def test():
-    if not TIINGO_TOKEN:
-        return jsonify({"status": "error", "detail": "TIINGO_TOKEN not set"})
-    try:
-        df = tiingo_history("VFIAX", years=0.02)
-        if df is None:  return jsonify({"status": "not found"})
-        if df.empty:    return jsonify({"status": "empty"})
-        return jsonify({"status": "ok",
-                        "VFIAX_last_close": round(df["adjClose"].dropna().iloc[-1], 2),
-                        "rows": len(df)})
-    except Exception as e:
-        return jsonify({"status": "error", "detail": str(e)})
 
 
 @app.route("/api/data")
