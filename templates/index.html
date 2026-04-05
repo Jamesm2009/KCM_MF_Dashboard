@@ -293,7 +293,6 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 
     <div class="badge">Updated: <b>{{ last_updated }}</b></div>
     <div class="badge">Funds: <b>{{ funds|length }}</b></div>
-    <a class="btn-refresh" href="/refresh" onclick="return doRefresh()">⟳ Refresh</a>
   </div>
 </header>
 
@@ -492,18 +491,6 @@ function toggleCol(cls) {
   document.querySelectorAll("." + cls).forEach(el => {
     el.classList.toggle("col-hidden");
   });
-}
-
-// ── Refresh ───────────────────────────────────────────────────────────────────
-function doRefresh() {
-  const btn = document.querySelector(".btn-refresh");
-  btn.textContent = "⏳ Refreshing…";
-  btn.style.opacity = ".6";
-  fetch("/refresh")
-    .then(r => r.json())
-    .then(() => { btn.textContent = "✓ Reloading…"; setTimeout(() => location.reload(), 600); })
-    .catch(() => { btn.textContent = "✗ Error"; btn.style.opacity = "1"; });
-  return false;
 }
 </script>
 </body>
