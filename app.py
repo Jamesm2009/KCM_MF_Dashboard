@@ -41,15 +41,16 @@ def load_funds():
 # ── Upstash Redis helpers ─────────────────────────────────────────────────────
 
 def redis_set(key, value, ex_seconds=90000):
-    """Store JSON value in Redis. ex_seconds=90000 ≈ 25 hours."""
+    """Store JSON value in Redis."""
     if not REDIS_URL or not REDIS_TOKEN:
         return False
     try:
         payload = json.dumps(value)
         r = requests.post(
-            f"{REDIS_URL}/set/{key}",
-            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
-            json={"value": payload, "ex": ex_seconds},
+            REDIS_URL,
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}",
+                     "Content-Type": "application/json"},
+            json=["SET", key, payload, "EX", ex_seconds],
             timeout=10
         )
         return r.status_code == 200
@@ -63,9 +64,11 @@ def redis_get(key):
     if not REDIS_URL or not REDIS_TOKEN:
         return None
     try:
-        r = requests.get(
-            f"{REDIS_URL}/get/{key}",
-            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+        r = requests.post(
+            REDIS_URL,
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}",
+                     "Content-Type": "application/json"},
+            json=["GET", key],
             timeout=10
         )
         if r.status_code != 200:
@@ -84,8 +87,10 @@ def redis_del(key):
         return
     try:
         requests.post(
-            f"{REDIS_URL}/del/{key}",
-            headers={"Authorization": f"Bearer {REDIS_TOKEN}"},
+            REDIS_URL,
+            headers={"Authorization": f"Bearer {REDIS_TOKEN}",
+                     "Content-Type": "application/json"},
+            json=["DEL", key],
             timeout=10
         )
     except Exception:
