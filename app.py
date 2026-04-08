@@ -232,12 +232,18 @@ def make_sparkline(closes, days=170, w=90, h=28):
            for i, v in enumerate(tail)]
     sma63 = c.tail(63).mean() if len(c) >= 63 else c.mean()
     col   = "#16a34a" if c.iloc[-1] > sma63 else "#dc2626"
+    sma_pts = []
+    for i, v in enumerate(tail):
+        window = tail[max(0, i-62):i+1]
+        sv = window.mean()
+        sma_pts.append(f"{round(i/n*w,1)},{round((1-(sv-mn)/(mx-mn))*(h-2)+1,1)}")
     return (f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}" '
             f'xmlns="http://www.w3.org/2000/svg">'
+            f'<polyline points="{" ".join(sma_pts)}" fill="none" stroke="#9ca3af" '
+            f'stroke-width="1" stroke-dasharray="2,2" stroke-linejoin="round" stroke-linecap="round"/>'
             f'<polyline points="{" ".join(pts)}" fill="none" stroke="{col}" '
             f'stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>'
             f'</svg>')
-
 
 def price_bar_data(closes):
     c = closes.dropna()
