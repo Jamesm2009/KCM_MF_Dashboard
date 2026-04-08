@@ -318,6 +318,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
   <button onclick="toggleCol('rs-col')">RS Score</button>
   <button onclick="toggleCol('zsc-col')">Z-Score</button>
   <button onclick="toggleCol('obos-col')">OB / OS</button>
+  <button onclick="toggleCol('ttm-col')">TTM Yield</button>
 </div>
 
 <!-- ── Table ── -->
@@ -409,6 +410,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
     <!-- TTM Yield -->
     <td class="ttm num">
       {% if f.ttm_yield %}{{ '%.2f'|format(f.ttm_yield) }}%{% else %}<span style="color:var(--muted)">—</span>{% endif %}
+      <td class="ttm num col-hidden ttm-col">
     </td>
 
     <!-- RS Score (hidden by default) -->
