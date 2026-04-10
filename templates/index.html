@@ -226,28 +226,79 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 
 <header>
   <div class="h-left">
-    <h1>📊 KCM Mutual Fund Performance Dashboard (updates daily at 9pm CT)</h1>
+    <h1>📊 KCM Mutual Fund Performance Dashboard (updates daily at 10:00pm CT)</h1>
     <div class="formula">RS Score = (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40) &nbsp;|&nbsp; Rank 1 = strongest relative strength</div>
   </div>
-  <div class="h-right">
-    {% if vix_signal == 'green' %}
-    <div class="risk-pill risk-green">
-      <span class="risk-dot rdot-green"></span>
-      RISK ON &nbsp;|&nbsp; VIXY {{ vix9d }} &lt; VXX {{ vix }}
-    </div>
-    {% elif vix_signal == 'red' %}
-    <div class="risk-pill risk-red">
-      <span class="risk-dot rdot-red"></span>
-      RISK OFF &nbsp;|&nbsp; VIXY {{ vix9d }} &gt; VXX {{ vix }}
-    </div>
-    {% else %}
-    <div class="risk-pill risk-grey">
-      <span class="risk-dot rdot-grey"></span>
-      RISK NEUTRAL &nbsp;|&nbsp; VIXY {{ vix9d }} ≈ VXX {{ vix }}
-    </div>
-    {% endif %}
-    <div class="badge">Updated: <b>{{ last_updated }}</b></div>
-    <div class="badge">Funds: <b>{{ funds|length }}</b></div>
+  
+{% if risk %}
+<a href="/risk-indicator" style="text-decoration:none;">
+  <div style="
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.85rem 0.4rem 0.6rem;
+    border-radius: 6px;
+    background: {{ risk.signal_color }}12;
+    border: 1px solid {{ risk.signal_color }}44;
+    cursor: pointer;
+    transition: background 0.15s;
+  ">
+    <!-- Colored dot -->
+    <span style="
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: {{ risk.signal_color }};
+      box-shadow: 0 0 6px {{ risk.signal_color }};
+      flex-shrink: 0;
+    "></span>
+
+    <!-- Signal label -->
+    <span style="
+      font-family: monospace;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: {{ risk.signal_color }};
+    ">{{ risk.signal }}</span>
+
+    <!-- Composite score -->
+    <span style="
+      font-family: monospace;
+      font-size: 0.72rem;
+      color: #6b8aaa;
+      letter-spacing: 0.04em;
+    ">{% if risk.composite >= 0 %}+{% endif %}{{ "%.2f"|format(risk.composite) }}</span>
+  </div>
+</a>
+{% else %}
+<!-- Risk indicator not yet computed - shows a neutral placeholder -->
+<a href="/risk-indicator" style="text-decoration:none;">
+  <div style="
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0.85rem 0.4rem 0.6rem;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.12);
+    cursor: pointer;
+  ">
+    <span style="
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; background: #4a6070; flex-shrink: 0;
+    "></span>
+    <span style="
+      font-family: monospace; font-size: 0.75rem;
+      letter-spacing: 0.08em; color: #5a7494;
+      text-transform: uppercase;
+    ">Risk Indicator</span>
+    <span style="font-family:monospace;font-size:0.7rem;color:#3a5060;">--</span>
+  </div>
+</a>
+{% endif %}
+
     <a class="btn-link" href="https://gex-vizualizer.vercel.app/" target="_blank" style="background:#7c3aed;">GEX</a>
   </div>
 </header>
