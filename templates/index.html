@@ -1,13 +1,13 @@
 {% macro pct_cell(v) %}
   {% if v is none %}<td class="num na">—</td>
   {% elif v == 0 %}<td class="num zero">0.00%</td>
-  {% elif v >= 5  %}<td class="num p3">+{{ '%.1f'|format(v) }}%</td>
-  {% elif v >= 2  %}<td class="num p2">+{{ '%.1f'|format(v) }}%</td>
-  {% elif v >= 0.5%}<td class="num p1">+{{ '%.1f'|format(v) }}%</td>
+  {% elif v >= 10  %}<td class="num p3">+{{ '%.1f'|format(v) }}%</td>
+  {% elif v >= 5  %}<td class="num p2">+{{ '%.1f'|format(v) }}%</td>
+  {% elif v >= 2.5%}<td class="num p1">+{{ '%.1f'|format(v) }}%</td>
   {% elif v > 0   %}<td class="num p0">+{{ '%.1f'|format(v) }}%</td>
-  {% elif v > -0.5%}<td class="num n0">{{ '%.1f'|format(v) }}%</td>
-  {% elif v > -2  %}<td class="num n1">{{ '%.1f'|format(v) }}%</td>
-  {% elif v > -5  %}<td class="num n2">{{ '%.1f'|format(v) }}%</td>
+  {% elif v > -2.5%}<td class="num n0">{{ '%.1f'|format(v) }}%</td>
+  {% elif v > -5  %}<td class="num n1">{{ '%.1f'|format(v) }}%</td>
+  {% elif v > -10  %}<td class="num n2">{{ '%.1f'|format(v) }}%</td>
   {% else         %}<td class="num n3">{{ '%.1f'|format(v) }}%</td>
   {% endif %}
 {% endmacro %}
