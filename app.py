@@ -27,7 +27,7 @@ REDIS_KEY_PRG = "mf_dashboard_progress"
 cache = {
     "data": {}, "ranked": [], "last_updated": "Loading...",
     "vix_signal": "grey", "vix9d_value": "—", "vix_value": "—",
-    "phase": 0, "progress": "Starting...", "error": None,
+    "phase": 0, "progress": "Starting...", "error": None, "ttm_last_updated": "—",
 }
 _lock    = threading.Lock()
 _started = False
@@ -105,7 +105,8 @@ def save_to_redis():
         "vix_signal":   cache["vix_signal"],
         "vix9d_value":  str(cache["vix9d_value"]),
         "vix_value":    str(cache["vix_value"]),
-        "phase":        cache["phase"],
+        "phase": cache["phase"],
+        "ttm_last_updated": cache.get("ttm_last_updated", "—"),
     }
     ok = redis_set(REDIS_KEY_MF, payload)
     print(f"  Redis save: {'OK' if ok else 'FAILED'} ({len(cache['data'])} funds)")
@@ -123,7 +124,8 @@ def load_from_redis():
     cache["vix_signal"]   = payload.get("vix_signal", "grey")
     cache["vix9d_value"]  = payload.get("vix9d_value", "—")
     cache["vix_value"]    = payload.get("vix_value", "—")
-    cache["phase"]        = payload.get("phase", 0)
+    cache["phase"] = payload.get("phase", 0)
+    cache["ttm_last_updated"] = payload.get("ttm_last_updated", "—")
     rebuild_ranked()
     n = len(cache["data"])
     print(f"  Redis restored {n} funds (phase={cache['phase']}).")
