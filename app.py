@@ -448,7 +448,7 @@ def index():
         vix=snap["vix_value"], is_loading=is_loading,
         phase=snap["phase"], progress=snap["progress"],
         error=snap["error"])
-
+        ttm_last_updated=snap.get("ttm_last_updated", "—"))
 
 @app.route("/refresh")
 def refresh():
