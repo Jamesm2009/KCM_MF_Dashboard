@@ -448,8 +448,7 @@ def index():
         vix=snap["vix_value"], is_loading=is_loading,
         phase=snap["phase"], progress=snap["progress"],
         error=snap["error"])
-        <span>&gt;Last TTM update: {{ ttm_last_updated }}</span>
-
+       
 @app.route("/refresh")
 def refresh():
     """Force a full fresh download — use once daily after market close."""
