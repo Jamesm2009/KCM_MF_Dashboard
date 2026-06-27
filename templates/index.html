@@ -195,9 +195,186 @@ td.bar-cell { min-width: 160px; padding: 4px 8px; }
 .col-hidden { display: none; }
 
 footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--border); margin-top: 4px; background: var(--surface); }
+
+/* ── Print button ── */
+.btn-print {
+  border: none; border-radius: 6px; padding: 6px 12px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  display: inline-block; color: #fff; background: #475569;
+}
+.btn-print:hover { background: #334155; }
+
+/* ── Print-only title banner ── */
+.print-title {
+  display: none;
+}
+
+/* ── Print styles ── */
+@media print {
+  @page {
+    size: landscape;
+    margin: 0.4in 0.3in;
+  }
+
+  /* Show print title banner */
+  .print-title {
+    display: block !important;
+    background: #1e2d45 !important;
+    color: #fff !important;
+    padding: 8px 14px !important;
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    text-align: left !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .print-title .print-sub {
+    font-size: 10px;
+    font-weight: 400;
+    color: #93c5fd;
+    margin-top: 2px;
+  }
+
+  /* Hide interactive / screen-only elements */
+  header,
+  .legend,
+  .toggle-bar,
+  #loading-banner,
+  #enrich-banner,
+  .btn-print,
+  footer { display: none !important; }
+
+  /* Reset page background */
+  body {
+    background: #fff !important;
+    font-size: 9px !important;
+    overflow: visible !important;
+  }
+
+  /* Table container — remove scroll, no padding */
+  .table-wrap {
+    overflow: visible !important;
+    padding: 0 !important;
+    width: 100% !important;
+    display: block !important;
+  }
+
+  /* Table — full width, no shadow, no min-width */
+  table {
+    min-width: 0 !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    font-size: 8.5px !important;
+  }
+
+  /* Repeating headers on every page */
+  thead { display: table-header-group !important; }
+  tbody { display: table-row-group !important; }
+  tr    { page-break-inside: avoid !important; }
+
+  /* Un-sticky the header row for print */
+  thead th {
+    position: static !important;
+    padding: 4px 3px !important;
+    font-size: 8px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .gh {
+    position: static !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Compact cells */
+  td {
+    padding: 3px 3px !important;
+    font-size: 8.5px !important;
+  }
+  td.rank { font-size: 10px !important; }
+  td.sym a { font-size: 9px !important; color: #000 !important; text-decoration: none !important; }
+  td.fname { max-width: 160px !important; font-size: 8.5px !important; }
+  td.ftype { font-size: 7.5px !important; max-width: 120px !important; }
+  td.spark { display: none !important; } /* sparkline SVGs don't print well */
+
+  /* Hide the sparkline header column too */
+  thead th[data-col="3"] { display: none !important; }
+  /* Adjust the group header colspan — hide the "8-Mth" label area since sparkline is hidden */
+
+  /* Performance colors — force print */
+  .p3, .p2, .p1, .p0, .n0, .n1, .n2, .n3 {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Category row tints */
+  tr.cat-equity, tr.cat-bond, tr.cat-target_date, tr.cat-balanced {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Flag circles */
+  .fc {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    width: 10px !important;
+    height: 10px !important;
+    box-shadow: none !important;
+  }
+
+  /* Category chips */
+  .cat-chip, .type-label {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-size: 7px !important;
+  }
+
+  /* OB/OS pills */
+  .pill-ob, .pill-os {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    font-size: 7.5px !important;
+  }
+
+  /* 3-year bar */
+  td.bar-cell { min-width: 120px !important; padding: 2px 4px !important; }
+  .bar-wrap { font-size: 7.5px !important; }
+  .bar-track {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .bar-fill {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Risk pill colors */
+  .risk-pill {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Keep hidden columns hidden in print */
+  .col-hidden { display: none !important; }
+
+  /* Links — no underline, black text */
+  a { color: #000 !important; text-decoration: none !important; }
+
+  /* Error banner */
+  div[style*="991b1b"] {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
 </style>
 </head>
 <body>
+<!-- Print-only title banner (hidden on screen, visible when printing) -->
+<div class="print-title">
+  📊 KCM Mutual Fund Performance Dashboard
+  <div class="print-sub">RS Score = (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40) &nbsp;|&nbsp; Rank 1 = strongest &nbsp;|&nbsp; Printed: <script>document.write(new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'2-digit'}));</script> &nbsp;|&nbsp; Data as of: {{ last_updated }}</div>
+</div>
 {% if error %}
 <div style="background:#991b1b;color:#fecaca;text-align:center;padding:10px;font-size:13px;font-weight:600;">
   ⚠ Error: {{ error }}
@@ -345,6 +522,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 <a class="btn-link2" href="https://etf.market-dashboards.com/" target="_blank" style="background:#d2e856;">ETFs</a>
 <a class="btn-link3" href="http://www.vixcentral.com/" target="_blank" style="background:#b3daf2;">VIX</a>
 <a class="btn-link4" href="https://docs.google.com/document/d/1m65Pmt6p_4W1oCifimjH9WHenHuWsWxM/edit" target="_blank" style="background:#e3dac9;">Info</a>
+<button class="btn-print" onclick="window.print()">🖨️ Print</button>
   </div>
 </header>
 
