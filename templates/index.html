@@ -18,6 +18,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>KCM Fund Dashboard - update 10pm daily</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
 :root {
   --bg:       #eef1f6;
@@ -367,6 +369,56 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
     print-color-adjust: exact !important;
   }
 }
+
+/* ── Tab bar ─────────────────────────────────────────────────────────────── */
+.tab-bar {
+  display: flex; gap: 0; padding: 0 16px;
+  background: #ffffff; border-bottom: 2px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.tab-btn {
+  background: none; border: none; border-bottom: 3px solid transparent;
+  color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .4px;
+  text-transform: uppercase; padding: 10px 24px; cursor: pointer;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Z-Score Chart panel ─────────────────────────────────────────────────── */
+.zchart-panel {
+  padding: 14px 16px;
+  background: #ffffff;
+}
+.zchart-controls {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--border);
+}
+.zchart-controls label {
+  font-size: 11px; color: var(--muted); font-weight: 700;
+  text-transform: uppercase; letter-spacing: .3px;
+}
+.zchart-controls select {
+  background: #f8fafc; border: 1px solid var(--border); border-radius: 5px;
+  color: var(--text); font-size: 13px; font-weight: 600;
+  padding: 5px 10px; cursor: pointer;
+}
+.zchart-legend {
+  display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted);
+  margin-left: auto;
+}
+.zchart-legend .lg { display: flex; align-items: center; gap: 5px; }
+.lg-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.lg-tri { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; }
+.zchart-wrap { position: relative; width: 100%; height: calc(100vh - 260px); min-height: 460px; }
+
+/* Hidden helper */
+.hidden { display: none !important; }
+
+/* Print — hide the tab bar and z-chart panel */
+@media print {
+  .tab-bar, #panel-zchart { display: none !important; }
+  #panel-table { display: block !important; }
+}
 </style>
 </head>
 <body>
@@ -526,6 +578,15 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
   </div>
 </header>
 
+<!-- ── Tab bar ── -->
+<div class="tab-bar">
+  <button class="tab-btn active" id="tab-btn-table"  onclick="switchTab('table')">Table</button>
+  <button class="tab-btn"        id="tab-btn-zchart" onclick="switchTab('zchart')">Z-Score Chart</button>
+</div>
+
+<!-- ── TABLE PANEL ── -->
+<div id="panel-table">
+
 <div class="legend">
   <b>Flags:</b>
   <span><span class="flag-dot dot-g"></span> Above avg</span>
@@ -670,6 +731,44 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
   Data: Tiingo API &nbsp;|&nbsp; Refreshes after US market close (9 PM CT) &nbsp;|&nbsp; Symbol links → Morningstar &nbsp;|&nbsp; Click any column header to sort
 </footer>
 
+</div><!-- /panel-table -->
+
+<!-- ── Z-SCORE CHART PANEL ── -->
+<div id="panel-zchart" class="hidden">
+  <div class="zchart-panel">
+    <div class="zchart-controls">
+      <label for="zc-filter">View:</label>
+      <select id="zc-filter" onchange="renderZChart()">
+        <option value="all">All Funds</option>
+        <option value="us_equity">US Equity</option>
+        <option value="intl_equity">International Equity</option>
+        <option value="bond">Bonds</option>
+        <option value="commodity">Commodity</option>
+        <option value="target_date">Target Date</option>
+        <option value="balanced">Balanced</option>
+      </select>
+
+      <div class="zchart-legend">
+        <span class="lg"><span class="lg-dot" style="background:#f97316;"></span>Equity</span>
+        <span class="lg"><span class="lg-dot" style="background:#3b82f6;"></span>Bond</span>
+        <span class="lg"><span class="lg-dot" style="background:#ca8a04;"></span>Target Date</span>
+        <span class="lg"><span class="lg-dot" style="background:#16a34a;"></span>Balanced</span>
+        <span class="lg"><span class="lg-dot" style="background:#7c3aed;"></span>Commodity</span>
+        <span class="lg"><span class="lg-tri" style="border-bottom:10px solid #dc2626;"></span>Benchmark</span>
+      </div>
+    </div>
+
+    <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
+      1-year Z-Score of price. Red band = Overbought (z &gt; +2). Green band = Oversold (z &lt; −2).
+      Benchmarks: SPY (US equity), VGK (Intl equity), TLT (long bonds), DBC (commodities). FBNRX also acts as a USD/Intl proxy for the Intl view.
+    </div>
+
+    <div class="zchart-wrap">
+      <canvas id="zscoreChart"></canvas>
+    </div>
+  </div>
+</div>
+
 <script>
 let sortCol = 0, sortAsc = true;
 
@@ -710,6 +809,338 @@ function cellVal(cell) {
 function toggleCol(cls) {
   document.querySelectorAll("." + cls).forEach(el => {
     el.classList.toggle("col-hidden");
+  });
+}
+
+
+// ── Tab switching ───────────────────────────────────────────────────────────
+
+function switchTab(tab) {
+  const tblPanel = document.getElementById('panel-table');
+  const zPanel   = document.getElementById('panel-zchart');
+  const tblBtn   = document.getElementById('tab-btn-table');
+  const zBtn     = document.getElementById('tab-btn-zchart');
+
+  if (tab === 'zchart') {
+    tblPanel.classList.add('hidden');
+    zPanel.classList.remove('hidden');
+    tblBtn.classList.remove('active');
+    zBtn.classList.add('active');
+    loadZChart();
+  } else {
+    zPanel.classList.add('hidden');
+    tblPanel.classList.remove('hidden');
+    zBtn.classList.remove('active');
+    tblBtn.classList.add('active');
+  }
+}
+
+
+// ── Z-Score Chart ───────────────────────────────────────────────────────────
+
+let zChartData = null;
+let zChartInstance = null;
+
+// Category → color for fund dots. Kept in-sync with the legend chips above.
+const Z_CAT_COLORS = {
+  us_equity:   '#f97316',
+  intl_equity: '#f97316',
+  bond:        '#3b82f6',
+  target_date: '#ca8a04',
+  balanced:    '#16a34a',
+  commodity:   '#7c3aed',
+};
+
+// Which benchmarks show for each view filter.
+const Z_FILTER_BENCH = {
+  all:         ['SPY','VGK','TLT','DBC'],
+  us_equity:   ['SPY'],
+  intl_equity: ['VGK','FBNRX'],   // FBNRX included as USD/Intl proxy
+  bond:        ['TLT'],
+  commodity:   ['SPY','TLT','DBC'],
+  target_date: ['SPY','TLT'],
+  balanced:    ['SPY','TLT'],
+};
+
+function loadZChart() {
+  if (zChartData) { renderZChart(); return; }
+  fetch('/api/zscores').then(r => r.json()).then(d => {
+    zChartData = d;
+    renderZChart();
+  }).catch(err => {
+    console.error('Z-Score fetch failed:', err);
+  });
+}
+
+function renderZChart() {
+  if (!zChartData) return;
+  const filter = document.getElementById('zc-filter').value;
+
+  // 1. Filter funds by chart_category. Special case: FBNRX (Templeton Global Bond)
+  //    also shows in intl_equity view as a USD proxy.
+  let funds = zChartData.funds.filter(f => f.zscore !== null);
+  if (filter !== 'all') {
+    funds = funds.filter(f => {
+      if (f.chart_category === filter) return true;
+      if (filter === 'intl_equity' && f.symbol === 'FBNRX') return true;
+      return false;
+    });
+  }
+
+  // 2. Pick benchmarks for this view
+  const benchSyms  = Z_FILTER_BENCH[filter] || [];
+  const benchMap   = {};
+  (zChartData.benchmarks || []).forEach(b => { benchMap[b.symbol] = b; });
+  const benchPts   = benchSyms
+    .map(sym => benchMap[sym])
+    .filter(b => b && b.zscore !== null);
+
+  // FBNRX shown in intl_equity: it's already in funds list, but we want it as
+  // a benchmark-style triangle instead of a plain dot. Handle by promoting it.
+  let promotedFbnrx = null;
+  if (filter === 'intl_equity') {
+    const idx = funds.findIndex(f => f.symbol === 'FBNRX');
+    if (idx >= 0) {
+      promotedFbnrx = funds[idx];
+      funds = funds.filter(f => f.symbol !== 'FBNRX');
+    }
+  }
+
+  // 3. Build the X-axis: funds first (sorted alphabetically by label),
+  //    then benchmarks. This gives predictable spacing.
+  funds.sort((a, b) => a.label.localeCompare(b.label));
+
+  const labels = [];
+  const fundPoints = [];
+  funds.forEach((f, i) => {
+    labels.push(f.label);
+    fundPoints.push({
+      x: labels.length - 1,
+      y: f.zscore,
+      _meta: f,
+    });
+  });
+
+  const benchPoints = [];
+  benchPts.forEach(b => {
+    labels.push(b.symbol);
+    benchPoints.push({
+      x: labels.length - 1,
+      y: b.zscore,
+      _meta: { label: b.symbol, name: b.name, zscore: b.zscore, isBench: true },
+    });
+  });
+
+  // FBNRX as extra benchmark-style triangle in intl view
+  const extraBenchPoints = [];
+  if (promotedFbnrx) {
+    labels.push('FBNRX');
+    extraBenchPoints.push({
+      x: labels.length - 1,
+      y: promotedFbnrx.zscore,
+      _meta: { label: 'FBNRX', name: promotedFbnrx.name, zscore: promotedFbnrx.zscore, isBench: true },
+    });
+  }
+
+  // 4. Build datasets — one dataset per category so colors are per-dot
+  const catDatasets = {};
+  fundPoints.forEach(pt => {
+    const cat = pt._meta.chart_category || 'us_equity';
+    if (!catDatasets[cat]) {
+      catDatasets[cat] = {
+        label: cat,
+        data: [],
+        backgroundColor: Z_CAT_COLORS[cat] || '#6b7280',
+        borderColor: '#ffffff',
+        borderWidth: 1.5,
+        pointRadius: 7,
+        pointHoverRadius: 9,
+        pointStyle: 'circle',
+        showLine: false,
+        datalabels: {
+          display: true,
+          formatter: (v, ctx) => ctx.dataset.data[ctx.dataIndex]._meta.label,
+          color: '#1a2035',
+          font: { size: 10, weight: '600' },
+          anchor: 'end',
+          align: 'top',
+          offset: 4,
+        },
+      };
+    }
+    catDatasets[cat].data.push(pt);
+  });
+
+  const datasets = Object.values(catDatasets);
+
+  if (benchPoints.length > 0) {
+    datasets.push({
+      label: 'Benchmarks',
+      data: benchPoints,
+      backgroundColor: '#dc2626',
+      borderColor: '#7f1d1d',
+      borderWidth: 1.5,
+      pointRadius: 9,
+      pointHoverRadius: 11,
+      pointStyle: 'triangle',
+      showLine: false,
+      datalabels: {
+        display: true,
+        formatter: (v, ctx) => ctx.dataset.data[ctx.dataIndex]._meta.label,
+        color: '#7f1d1d',
+        font: { size: 11, weight: '700' },
+        anchor: 'end',
+        align: 'top',
+        offset: 6,
+      },
+    });
+  }
+  if (extraBenchPoints.length > 0) {
+    datasets.push({
+      label: 'FBNRX (USD proxy)',
+      data: extraBenchPoints,
+      backgroundColor: '#7c3aed',
+      borderColor: '#4c1d95',
+      borderWidth: 1.5,
+      pointRadius: 9,
+      pointHoverRadius: 11,
+      pointStyle: 'triangle',
+      showLine: false,
+      datalabels: {
+        display: true,
+        formatter: (v, ctx) => ctx.dataset.data[ctx.dataIndex]._meta.label,
+        color: '#4c1d95',
+        font: { size: 11, weight: '700' },
+        anchor: 'end',
+        align: 'top',
+        offset: 6,
+      },
+    });
+  }
+
+  // Compute y-axis bounds. Force ±3 minimum so bands render consistently.
+  let yMin = -3, yMax = 3;
+  [...fundPoints, ...benchPoints, ...extraBenchPoints].forEach(p => {
+    if (p.y < yMin) yMin = Math.floor(p.y - 0.3);
+    if (p.y > yMax) yMax = Math.ceil(p.y + 0.3);
+  });
+
+  // Overbought/oversold band plugin
+  const bandsPlugin = {
+    id: 'obosBands',
+    beforeDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      if (!chartArea) return;
+      const yScale = scales.y;
+      const yOB2 = yScale.getPixelForValue(2);
+      const yOS2 = yScale.getPixelForValue(-2);
+      // Overbought red band (above +2)
+      ctx.fillStyle = 'rgba(239, 68, 68, 0.10)';
+      ctx.fillRect(chartArea.left, chartArea.top, chartArea.right - chartArea.left, yOB2 - chartArea.top);
+      // Oversold green band (below −2)
+      ctx.fillStyle = 'rgba(34, 197, 94, 0.10)';
+      ctx.fillRect(chartArea.left, yOS2, chartArea.right - chartArea.left, chartArea.bottom - yOS2);
+      // Zero line
+      ctx.save();
+      ctx.setLineDash([4,4]);
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1;
+      const y0 = yScale.getPixelForValue(0);
+      ctx.beginPath(); ctx.moveTo(chartArea.left, y0); ctx.lineTo(chartArea.right, y0); ctx.stroke();
+      ctx.restore();
+      // Zone labels
+      ctx.save();
+      ctx.font = 'bold 10px system-ui';
+      ctx.fillStyle = 'rgba(220, 38, 38, 0.55)';
+      ctx.textAlign = 'left';
+      ctx.fillText('OVERBOUGHT (z > +2)', chartArea.left + 6, yOB2 - 4);
+      ctx.fillStyle = 'rgba(22, 163, 74, 0.55)';
+      ctx.fillText('OVERSOLD (z < −2)', chartArea.left + 6, yOS2 + 14);
+      ctx.restore();
+    }
+  };
+
+  // Register datalabels plugin once
+  if (window.ChartDataLabels && !window._zChartRegistered) {
+    Chart.register(window.ChartDataLabels);
+    window._zChartRegistered = true;
+  }
+
+  if (zChartInstance) { zChartInstance.destroy(); }
+
+  const canvas = document.getElementById('zscoreChart');
+  zChartInstance = new Chart(canvas.getContext('2d'), {
+    type: 'scatter',
+    data: { labels: labels, datasets: datasets },
+    plugins: [bandsPlugin],
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 300 },
+      layout: { padding: { top: 20, right: 30, bottom: 30, left: 20 } },
+      scales: {
+        x: {
+          type: 'linear',
+          min: -0.5,
+          max: labels.length - 0.5,
+          ticks: {
+            stepSize: 1,
+            color: 'rgba(0,0,0,0.6)',
+            font: { size: 10, weight: '600' },
+            callback: function(v) {
+              const i = Math.round(v);
+              return (i >= 0 && i < labels.length) ? labels[i] : '';
+            },
+            maxRotation: 60,
+            minRotation: 45,
+            autoSkip: false,
+          },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          border: { color: 'rgba(0,0,0,0.15)' },
+        },
+        y: {
+          min: yMin,
+          max: yMax,
+          ticks: {
+            stepSize: 0.5,
+            color: 'rgba(0,0,0,0.5)',
+            font: { size: 10 },
+            callback: v => v.toFixed(1),
+          },
+          grid: {
+            color: ctx => ctx.tick && ctx.tick.value === 0
+              ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.04)',
+            lineWidth: ctx => ctx.tick && ctx.tick.value === 0 ? 1.5 : 0.5,
+          },
+          title: {
+            display: true,
+            text: '1-Year Z-Score',
+            color: 'rgba(0,0,0,0.6)',
+            font: { size: 11, weight: '700' },
+          },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          borderColor: '#475569',
+          borderWidth: 1,
+          titleColor: '#f1f5f9',
+          bodyColor: '#cbd5e1',
+          callbacks: {
+            title: (items) => items[0].raw._meta.label,
+            label: function(ctx) {
+              const m = ctx.raw._meta;
+              const lines = [];
+              if (m.name) lines.push(m.name);
+              lines.push('Z-Score: ' + m.zscore.toFixed(2));
+              return lines;
+            }
+          }
+        },
+      },
+    },
   });
 }
 </script>
