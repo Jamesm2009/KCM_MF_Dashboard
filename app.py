@@ -24,10 +24,60 @@ REDIS_TOKEN   = os.environ.get("UPSTASH_REDIS_REST_TOKEN", "")
 REDIS_KEY_MF  = "mf_dashboard_cache"
 REDIS_KEY_PRG = "mf_dashboard_progress"
 
+# ── Z-Score chart benchmarks ──────────────────────────────────────────────────
+# These get their Z-scores computed alongside fund data and displayed as
+# reference markers on the Z-Score Chart tab.
+BENCHMARKS = [
+    {"symbol": "SPY", "name": "S&P 500 ETF",           "role": "us_equity"},
+    {"symbol": "VGK", "name": "FTSE Europe ETF",       "role": "intl_equity"},
+    {"symbol": "TLT", "name": "20+ Yr Treasury ETF",   "role": "bonds"},
+    {"symbol": "DBC", "name": "Broad Commodity ETF",   "role": "commodity"},
+]
+
+
+def classify_fund(fund):
+    """
+    Return chart-filter category for a fund based on its category + type text.
+    Used only by the Z-Score Chart; does not affect the main table.
+    Options: us_equity | intl_equity | bond | target_date | balanced | commodity
+    """
+    cat  = (fund.get("category") or "").lower()
+    typ  = (fund.get("type") or "").lower()
+    name = (fund.get("name") or "").lower()
+    hay  = typ + " " + name
+
+    if cat == "target_date":
+        return "target_date"
+    if cat == "balanced":
+        return "balanced"
+    if cat == "bond":
+        # Templeton Global Bond doubles as USD/Intl proxy
+        return "bond"
+    # Everything else has category == 'equity' in current funds.json
+    if "commodit" in hay:
+        return "commodity"
+    if "intl" in hay or "international" in hay or "europacific" in hay or "emerging" in hay:
+        return "intl_equity"
+    if "us + intl" in hay:
+        # SmallCaps World spans both; treat as intl for chart
+        return "intl_equity"
+    return "us_equity"
+
+
+def target_date_short_label(name):
+    """Turn '2010 T.R. Price Retirement' into '2010' for chart labels."""
+    if not name:
+        return ""
+    for token in name.split():
+        if token.isdigit() and len(token) == 4:
+            return token
+    return name
+
 cache = {
     "data": {}, "ranked": [], "last_updated": "Loading...",
     "vix_signal": "grey", "vix9d_value": "—", "vix_value": "—",
     "phase": 0, "progress": "Starting...", "error": None, "ttm_last_updated": "—",
+    "benchmarks": {},
 }
 _lock    = threading.Lock()
 _started = False
@@ -107,6 +157,7 @@ def save_to_redis():
         "vix_value":    str(cache["vix_value"]),
         "phase": cache["phase"],
         "ttm_last_updated": cache.get("ttm_last_updated", "—"),
+        "benchmarks":   cache.get("benchmarks", {}),
     }
     ok = redis_set(REDIS_KEY_MF, payload)
     print(f"  Redis save: {'OK' if ok else 'FAILED'} ({len(cache['data'])} funds)")
@@ -126,6 +177,24 @@ def load_from_redis():
     cache["vix_value"]    = payload.get("vix_value", "—")
     cache["phase"] = payload.get("phase", 0)
     cache["ttm_last_updated"] = payload.get("ttm_last_updated", "—")
+    cache["benchmarks"] = payload.get("benchmarks", {})
+
+    # Backfill chart fields on funds cached before Z-Score chart was added
+    try:
+        funds_lookup = {f["symbol"]: f for f in load_funds()}
+    except Exception:
+        funds_lookup = {}
+    for sym, row in cache["data"].items():
+        if "chart_category" not in row or "chart_label" not in row:
+            fund_def = funds_lookup.get(sym, {
+                "symbol": sym, "name": row.get("name",""),
+                "type":   row.get("type",""), "category": row.get("category",""),
+            })
+            row["chart_category"] = classify_fund(fund_def)
+            row["chart_label"] = (target_date_short_label(row.get("name",""))
+                                  if row.get("category") == "target_date"
+                                  else sym)
+
     rebuild_ranked()
     n = len(cache["data"])
     print(f"  Redis restored {n} funds (phase={cache['phase']}).")
@@ -360,6 +429,9 @@ def run_update():
                 row = {
                     "symbol": ticker, "name": name,
                     "type": ftype, "category": category,
+                    "chart_category": classify_fund(fund),
+                    "chart_label":    (target_date_short_label(name)
+                                       if category == "target_date" else ticker),
                     "morningstar_url": ms_url,
                     "sparkline":   make_sparkline(closes),
                     "1D": fmt(d1), "1W": fmt(w1), "1M": fmt(m1),
@@ -386,6 +458,37 @@ def run_update():
                 print(f"    ERR {ticker}: {e}")
 
             time.sleep(3)
+
+        # ── Benchmarks for Z-Score Chart tab ─────────────────────────────────
+        with _lock:
+            cache["progress"] = "Fetching benchmark Z-scores..."
+        print("  Fetching benchmark tickers for Z-Score Chart...")
+        bench_out = {}
+        for bench in BENCHMARKS:
+            bsym = bench["symbol"]
+            try:
+                bdf = tiingo_history(bsym, years=1.2)
+                if bdf is None or bdf.empty:
+                    print(f"    {bsym}: no data")
+                    continue
+                bcloses = bdf["adjClose"].dropna()
+                if len(bcloses) < 60:
+                    print(f"    {bsym}: insufficient history")
+                    continue
+                bzsc = zscore_1yr(bcloses)
+                bench_out[bsym] = {
+                    "symbol": bsym,
+                    "name":   bench["name"],
+                    "role":   bench["role"],
+                    "zscore": bzsc,
+                }
+                print(f"    {bsym}: z={bzsc}")
+            except Exception as e:
+                print(f"    {bsym} ERR: {e}")
+            time.sleep(3)
+
+        with _lock:
+            cache["benchmarks"] = bench_out
 
         # VIX
         with _lock:
@@ -479,6 +582,30 @@ def status():
 def api_data():
     with _lock:
         return jsonify(cache["ranked"])
+
+
+@app.route("/api/zscores")
+def api_zscores():
+    """Data for the Z-Score Chart tab: funds + benchmarks."""
+    with _lock:
+        funds_out = []
+        for row in cache["ranked"]:
+            if row.get("zscore") is None:
+                continue
+            funds_out.append({
+                "symbol":         row.get("symbol"),
+                "name":           row.get("name"),
+                "label":          row.get("chart_label") or row.get("symbol"),
+                "chart_category": row.get("chart_category") or "us_equity",
+                "category":       row.get("category"),
+                "zscore":         row.get("zscore"),
+            })
+        benchmarks = list(cache.get("benchmarks", {}).values())
+        return jsonify({
+            "funds":        funds_out,
+            "benchmarks":   benchmarks,
+            "last_updated": cache["last_updated"],
+        })
 
 
 if __name__ == "__main__":
