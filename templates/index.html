@@ -470,6 +470,164 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
   margin-top: 10px; line-height: 1.5;
 }
 
+/* ── Guide panel ─────────────────────────────────────────────────────────
+   Bright, readable typography with generous spacing. Written for KCM
+   colleagues at varying experience levels — informal, practical tone.
+   ────────────────────────────────────────────────────────────────────── */
+.guide-panel {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 28px 32px 60px;
+  background: #ffffff;
+  color: #1a2035;
+  font-size: 15px;
+  line-height: 1.65;
+}
+.guide-panel h2 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 34px 0 10px;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #e2e8f0;
+}
+.guide-panel h2:first-child { margin-top: 0; }
+.guide-panel h3 {
+  font-size: 17px;
+  font-weight: 700;
+  color: #2563eb;
+  margin: 22px 0 6px;
+}
+.guide-panel h4 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a2035;
+  margin: 16px 0 4px;
+}
+.guide-panel p {
+  font-size: 15px;
+  line-height: 1.65;
+  color: #1a2035;
+  margin-bottom: 12px;
+}
+.guide-panel ul, .guide-panel ol {
+  margin: 8px 0 14px 22px;
+  padding: 0;
+}
+.guide-panel li {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #1a2035;
+  margin-bottom: 6px;
+}
+.guide-panel a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.guide-panel a:hover { color: #1d4ed8; }
+.guide-panel .intro {
+  background: #eff6ff;
+  border-left: 4px solid #2563eb;
+  padding: 14px 18px;
+  border-radius: 0 8px 8px 0;
+  margin: 10px 0 20px;
+  font-size: 15px;
+  color: #1e3a8a;
+}
+.guide-panel .tip {
+  background: #ecfdf5;
+  border-left: 4px solid #16a34a;
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin: 14px 0;
+  font-size: 14.5px;
+  color: #14532d;
+}
+.guide-panel .warn {
+  background: #fef3c7;
+  border-left: 4px solid #d97706;
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin: 14px 0;
+  font-size: 14.5px;
+  color: #78350f;
+}
+.guide-panel .caveat {
+  background: #fef2f2;
+  border-left: 4px solid #dc2626;
+  padding: 12px 16px;
+  border-radius: 0 6px 6px 0;
+  margin: 14px 0;
+  font-size: 14.5px;
+  color: #7f1d1d;
+}
+.guide-panel table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 12px 0 20px;
+  font-size: 14px;
+  background: #ffffff;
+}
+.guide-panel thead th {
+  background: #1e2d45;
+  color: #93c5fd;
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.guide-panel tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  vertical-align: top;
+  color: #1a2035;
+}
+.guide-panel tbody tr:last-child td { border-bottom: none; }
+.guide-panel code {
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', monospace;
+  font-size: 13.5px;
+  color: #1e3a8a;
+}
+.guide-panel .toc {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+.guide-panel .toc-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.guide-panel .toc ol {
+  margin: 0 0 0 22px;
+}
+.guide-panel .toc li { margin-bottom: 3px; }
+
+/* Print — when the Guide is active, hide everything else */
+@media print {
+  body.print-guide #panel-table  { display: none !important; }
+  body.print-guide #panel-zchart { display: none !important; }
+  body.print-guide #panel-guide  { display: block !important; }
+  body.print-guide .guide-panel {
+    padding: 0;
+    max-width: none;
+    font-size: 11pt;
+  }
+}
+
 /* Hidden helper */
 .hidden { display: none !important; }
 
@@ -607,6 +765,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 <div class="tab-bar">
   <button class="tab-btn active" id="tab-btn-table"  onclick="switchTab('table')">Table</button>
   <button class="tab-btn"        id="tab-btn-zchart" onclick="switchTab('zchart')">Z-Score Chart</button>
+  <button class="tab-btn"        id="tab-btn-guide"  onclick="switchTab('guide')">Guide</button>
 </div>
 
 <!-- ── TABLE PANEL ── -->
@@ -779,8 +938,8 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
         <button class="zc-trail-btn"        data-trail="13"  onclick="setTrail('13')">13-Week Trail</button>
       </div>
 
-      <div style="font-size:14px;color:var(--muted);margin-bottom:10px;">
-      Click on the symbol to view last 8 months price chart in pop-up.
+      <div style="font-size:12px;color:var;margin-bottom:8px;">
+      Click symbol for 8 month chart pop-up. 
       </div>
       
       <div class="zchart-legend">
@@ -830,6 +989,404 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
         (bond funds distribute monthly; equity/commodity funds annually, often in December).
       </div>
     </div>
+  </div>
+</div>
+
+<!-- ── GUIDE PANEL ──────────────────────────────────────────────────────────
+     Written for KCM colleagues at varying experience levels. Practical,
+     honest tone. Links to Investopedia for concepts that deserve deeper
+     explanation than this guide can give.
+     ────────────────────────────────────────────────────────────────────── -->
+<div id="panel-guide" class="hidden">
+  <div class="guide-panel">
+
+    <h2>KCM Mutual Fund Dashboard — Guide</h2>
+
+    <div class="intro">
+      This dashboard is a tool for reviewing the KCM mutual fund universe at a glance.
+      It's not investment advice, and it's not a trading system — it's a way to spot
+      what's worth a closer look. Everything here is designed for <b>strategic allocation
+      decisions over multi-week horizons</b>, not day trading. Read it in that spirit.
+    </div>
+
+    <div class="toc">
+      <div class="toc-title">What's in this guide</div>
+      <ol>
+        <li>What this dashboard is for</li>
+        <li>The header — risk signal and quick links</li>
+        <li>The Table tab — reading the data</li>
+        <li>The Z-Score Chart tab — spotting extremes</li>
+        <li>A practical way to use it</li>
+        <li>Limitations and gotchas</li>
+      </ol>
+    </div>
+
+    <!-- ── 1. What This Dashboard Is For ─────────────────────────────── -->
+    <h2>1. What this dashboard is for</h2>
+
+    <p>
+      The dashboard tracks the 35 mutual funds in the KCM universe. Every trading day,
+      after market close, it downloads fresh price data, calculates a set of standard
+      analytical signals, and presents them in a way that makes patterns visible.
+    </p>
+
+    <p>
+      The point is <b>identifying which funds deserve attention right now</b> — funds that
+      are showing unusual strength, funds that are cooling off, funds sitting at extreme
+      levels either high or low. Once something catches your eye here, the deeper research
+      happens elsewhere (Morningstar, fund fact sheets, whatever tools you normally use).
+      This is a starting point, not a destination.
+    </p>
+
+    <p>
+      There are three tabs:
+    </p>
+    <ul>
+      <li><b>Table</b> — every fund on one screen, sortable by any column. Best for
+        scanning the whole universe.</li>
+      <li><b>Z-Score Chart</b> — a visual view of which funds are stretched high, sitting
+        near their range midpoints, or oversold. Best for spotting outliers.</li>
+      <li><b>Guide</b> — this page.</li>
+    </ul>
+
+    <!-- ── 2. The Header ─────────────────────────────────────────────── -->
+    <h2>2. The header — risk signal and quick links</h2>
+
+    <h3>The risk indicator pill</h3>
+
+    <p>
+      Top-center, you'll see something like <b>NEUTRAL +0.10</b> or <b>RISK ON +1.77</b>
+      in a colored pill. This is the <b>VIX Term Trigger</b>, a short-term tactical
+      read on market stress. Clicking it opens the full risk indicator dashboard.
+    </p>
+
+    <p>
+      It combines two things: (1) the shape of the VIX futures curve (70% weight), and
+      (2) SPY's 5-day rate of change (30% weight). Both are Z-scored over the last 63
+      trading days — roughly three months. If you want to understand
+      <a href="https://www.investopedia.com/terms/v/vix.asp" target="_blank">the VIX</a> or
+      <a href="https://www.investopedia.com/terms/z/zscore.asp" target="_blank">Z-scores</a>
+      in more depth, those are good starting points.
+    </p>
+
+    <p>What the pill is telling you:</p>
+
+    <table>
+      <thead>
+        <tr><th>Signal</th><th>What it means</th><th>How to use it</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><b>Bullish</b> (green, positive)</td>
+          <td>Low market stress, momentum positive</td>
+          <td>Environment supports risk-taking. Existing positions look fine.</td>
+        </tr>
+        <tr>
+          <td><b>Neutral</b> (amber, near zero)</td>
+          <td>No clear signal either direction</td>
+          <td>Don't add aggressively. Watch for a lean in either direction.</td>
+        </tr>
+        <tr>
+          <td><b>Bearish</b> (red, negative)</td>
+          <td>Stress building, momentum weak</td>
+          <td>Pause new equity additions. Review higher-risk holdings.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="tip">
+      <b>Why this indicator and not the ETF dashboard's Risk Indicator?</b>
+      The ETF dashboard's indicator uses a 252-day (one-year) window — it's a
+      slow, confirming strategic signal. This one uses 63 days — faster and more
+      leading. For mutual fund decisions where you're not trading daily, a signal
+      that gives a little bit of warning is more useful than one that confirms
+      what already happened.
+    </div>
+
+    <h3>The header buttons</h3>
+
+    <ul>
+      <li><b>Regime</b> — the macro regime dashboard. Which of four broad regimes
+        (Goldilocks / Reflation / Stagflation / Deflation) is most likely active.
+        Useful for the "big picture" context before drilling into fund decisions.</li>
+      <li><b>ETFs</b> — the sister ETF dashboard. Same analytical framework applied
+        to 70 ETFs across 8 categories. More detail on tactical positioning.</li>
+      <li><b>VIX</b> — vixcentral.com, showing the VIX term structure. Useful for
+        confirming whether the risk pill's read is being echoed in options markets.</li>
+      <li><b>Info</b> — the shared user guide for both dashboards (the more
+        comprehensive combined document).</li>
+    </ul>
+
+    <!-- ── 3. The Table Tab ──────────────────────────────────────────── -->
+    <h2>3. The Table tab — reading the data</h2>
+
+    <p>
+      The Table view has one row per fund, sorted by rank. Click any column header
+      to re-sort. Click the ticker (blue text on the left) to open the fund's
+      Morningstar page in a new tab.
+    </p>
+
+    <h3>Rank and RS Score</h3>
+
+    <p>
+      Every fund gets a <b>Relative Strength (RS) Score</b> that combines its recent
+      returns across four timeframes:
+    </p>
+
+    <p style="text-align:center; font-family:monospace; background:#f1f5f9; padding:10px; border-radius:6px;">
+      RS Score = (1-Day × 10%) + (1-Week × 20%) + (1-Month × 30%) + (3-Month × 40%)
+    </p>
+
+    <p>
+      The idea:
+      <a href="https://www.investopedia.com/terms/r/relativestrength.asp" target="_blank">relative
+      strength</a> is a well-established concept for identifying which securities are
+      outperforming right now. The weighting deliberately emphasizes recent-but-not-immediate
+      performance — the 3-month figure dominates, but the 1-day figure keeps you aware
+      of very recent moves. Rank 1 is the fund with the highest RS Score across the universe.
+    </p>
+
+    <div class="tip">
+      <b>Watch rank changes, not just absolute ranks.</b> A fund moving from rank 25
+      to rank 8 tells you something more actionable than a fund that has been sitting
+      at rank 4 for months. Rising ranks = strengthening. Falling ranks = deteriorating.
+    </div>
+
+    <h3>Performance columns (1D, 1W, 1M, 3M, 6M, YTD, 1Y)</h3>
+
+    <p>
+      Each column is a return over that timeframe, color-coded by intensity:
+      dark green = very strong (+10% or more), through pale green, pale red, medium red,
+      to dark red (−10% or worse). The color makes it easy to scan across a row and
+      see where strength or weakness is concentrated.
+    </p>
+
+    <p>
+      Don't over-weight the 1D column when making decisions. Single-day moves are noisy —
+      that's why they're only 10% of the RS Score. The 1M and 3M columns tell you more.
+    </p>
+
+    <h3>Sparkline (the small chart in each row)</h3>
+
+    <p>
+      An 8-month price chart, very small. The line is green when the fund is above its
+      63-day moving average (uptrend), red when below (downtrend). The dashed grey line
+      is the moving average itself. Useful for a very quick "is this trend intact?" read
+      without needing to open a full chart.
+    </p>
+
+    <h3>SMA Flags (±1M and ±3M columns on the right)</h3>
+
+    <p>
+      Two colored dots per fund:
+    </p>
+
+    <ul>
+      <li><b>±1M</b> — position vs the 21-day moving average (short-term trend)</li>
+      <li><b>±3M</b> — position vs the 63-day moving average (intermediate-term trend)</li>
+    </ul>
+
+    <p>
+      Green = above the moving average, red = below, grey = at it. What
+      <a href="https://www.investopedia.com/terms/s/sma.asp" target="_blank">moving averages</a>
+      actually give you is a simple, mechanical "which side of the trend am I on" answer.
+      Both green is the strongest signal for adding. Both red is the strongest signal
+      for reducing. Mixed signals (one green, one red) often mean a short-term pullback
+      inside a longer trend — the interpretation depends on which is which.
+    </p>
+
+    <h3>3-Year Low ▸ Last ▸ High bar</h3>
+
+    <p>
+      Shows where today's price sits within the fund's 3-year range. A percentage like
+      "88% of range" means the current price is 88% of the way from the 3-year low to
+      the 3-year high. Useful for context: is this fund at fresh highs, or still well
+      below its peak?
+    </p>
+
+    <h3>Optional columns (RS Score, Z-Score, OB/OS, TTM Yield)</h3>
+
+    <p>
+      Toggle these on via the "Show/Hide" buttons above the table. The Z-Score column
+      is the same math used on the Z-Score Chart tab (explained below).
+      <b>TTM Yield</b> is the trailing 12-month distribution yield —
+      useful for income-focused positions but doesn't affect trend or momentum reads.
+    </p>
+
+    <!-- ── 4. The Z-Score Chart Tab ──────────────────────────────────── -->
+    <h2>4. The Z-Score Chart tab — spotting extremes</h2>
+
+    <p>
+      This is a visual way to see which funds are sitting at unusual price levels.
+      Every fund shows as a dot on a vertical scale from −3 to +3. The scale is a
+      <a href="https://www.investopedia.com/terms/z/zscore.asp" target="_blank">Z-Score</a> —
+      how far the current price is from the fund's 1-year average, measured in standard deviations.
+    </p>
+
+    <ul>
+      <li><b>Above +2</b> — statistically overbought. Red band. Watch for mean reversion.</li>
+      <li><b>Between −2 and +2</b> — normal range. Most funds sit here most of the time.</li>
+      <li><b>Below −2</b> — statistically oversold. Green band. Potential opportunity if the trend is intact.</li>
+    </ul>
+
+    <p>
+      Practical translation: the Z-Score doesn't tell you a fund is a good buy or sell.
+      It tells you how <em>unusual</em> the current price is relative to the last year of
+      that fund's own behavior. An extreme reading is a prompt to look closer, not a signal
+      to act.
+    </p>
+
+    <h3>Filters</h3>
+
+    <p>
+      The "View" dropdown lets you filter by fund category — All Funds, US Equity,
+      International Equity, Bonds, Commodity, Target Date, or Balanced. Each filtered view
+      also shows relevant benchmark ETFs (as red triangles) so you can see where market
+      averages sit alongside the funds:
+    </p>
+
+    <ul>
+      <li><b>SPY</b> — US equity benchmark</li>
+      <li><b>VGK</b> — international equity benchmark</li>
+      <li><b>TLT</b> — long duration bond benchmark</li>
+      <li><b>DBC</b> — broad commodity benchmark</li>
+      <li><b>FBNRX</b> — appears as a purple triangle in the International view as a USD proxy</li>
+    </ul>
+
+    <h3>Latest Close vs 13-Week Trail</h3>
+
+    <p>
+      <b>Latest Close</b> (default) shows one dot per fund at today's Z-Score. Simple and clean.
+    </p>
+
+    <p>
+      <b>13-Week Trail</b> stacks 13 smaller historical dots underneath each current position,
+      one per week. This lets you see the <em>trajectory</em> — is this fund climbing steadily
+      into overbought territory, or has it retraced from higher levels? A wide vertical spread
+      means the fund has moved a lot; a tight cluster means it's been sitting where it is.
+    </p>
+
+    <div class="tip">
+      <b>The trail reveals what the current snapshot can't.</b> Two funds might both sit at
+      Z-Score +1.5 today, but one might have climbed there from −0.5 (accelerating) while
+      the other has retraced from +2.8 (cooling off). The trail shows you which is which.
+    </div>
+
+    <h3>Click a dot for the 8-month price chart</h3>
+
+    <p>
+      Click any current-day dot (not the small trail dots) to open a modal showing that
+      fund's actual price over the last 8 months, auto-scaled. This is the "what does this
+      look like in real dollars?" view — trend shape, recent highs and lows, and any unusual
+      moves become visible.
+    </p>
+
+    <div class="warn">
+      <b>Watch out for distribution effects.</b> Sharp step-downs on a fund's price chart
+      often reflect distributions, not price crashes. Bond funds distribute monthly (small,
+      regular steps). Equity and commodity funds distribute annually — usually in December.
+      GCCUX (Goldman Sachs Commodity Strategy), for example, showed a large year-end 2025
+      distribution. The chart uses adjusted prices to smooth these where possible, but not
+      all distributions get fully absorbed.
+    </div>
+
+    <!-- ── 5. Practical Workflow ─────────────────────────────────────── -->
+    <h2>5. A practical way to use it</h2>
+
+    <p>
+      There's no rigid formula — how you use the dashboard depends on what question you're
+      trying to answer. But here's how a typical review might go:
+    </p>
+
+    <ol>
+      <li>
+        <b>Start with the header.</b> What is the risk pill saying? Bullish, neutral, or
+        bearish? This sets your posture — the same fund data reads differently depending on
+        the broader environment.
+      </li>
+      <li>
+        <b>Open the Z-Score Chart tab.</b> Filter to All Funds. Where's the universe sitting?
+        Is everything in the upper half of the range (broadly extended)? Is there a mix?
+        Are any funds in the green oversold band?
+      </li>
+      <li>
+        <b>Turn on the 13-Week Trail.</b> Which funds are trending up? Which are cooling
+        off from higher levels? Which have been flat? This trajectory context often matters
+        more than the current level.
+      </li>
+      <li>
+        <b>Click into any fund that catches your eye</b> for the price modal. Does the
+        actual price action confirm what the Z-Score suggested?
+      </li>
+      <li>
+        <b>Switch to the Table tab</b> for anything that made your shortlist. Check the
+        RS rank, the SMA flags, and the sparkline. If everything lines up — RS is decent,
+        both flags are green, trend is intact — you have a candidate. If signals conflict,
+        that's worth a pause.
+      </li>
+      <li>
+        <b>Click through to Morningstar</b> for anything you're seriously considering.
+        The dashboard tells you what and when; Morningstar tells you why.
+      </li>
+    </ol>
+
+    <p>
+      Reverse the flow if you're checking existing positions rather than looking for new
+      ones. Sort the table by rank, look for anything that has dropped, and use the
+      Z-Score Chart to see whether the decline is idiosyncratic or part of a broader
+      category move.
+    </p>
+
+    <!-- ── 6. Limitations ────────────────────────────────────────────── -->
+    <h2>6. Limitations and gotchas</h2>
+
+    <div class="caveat">
+      <b>Mutual fund pricing lags a day.</b> Mutual fund NAVs are calculated once daily
+      after market close. Tiingo (the data provider) publishes them the following morning.
+      This means the "current" price you see is technically yesterday's closing NAV.
+      For decisions on multi-week horizons this doesn't matter. For same-day comparisons
+      to ETFs it does.
+    </div>
+
+    <p>
+      Other things worth knowing:
+    </p>
+
+    <ul>
+      <li>
+        <b>The RS Score is backward-looking.</b> It tells you what happened, not what will
+        happen. High RS means a fund has been strong; it doesn't mean it will stay strong.
+      </li>
+      <li>
+        <b>Z-Scores can stay extreme for weeks.</b> A fund with Z-Score +2.5 might not
+        mean-revert for a while — it might just keep going up. Use Z-Score as a "should I
+        be adding right now?" filter, not a "should I sell?" trigger on its own.
+      </li>
+      <li>
+        <b>No benchmark on the price modal.</b> Benchmarking mutual funds properly is
+        genuinely hard — Morningstar spends significant effort building category-specific
+        benchmarks for exactly this reason. Rather than picking a rough benchmark that
+        might mislead, the modal shows only the fund's own price. The Z-Score Chart already
+        gives you relative-to-market context via SPY, VGK, TLT, DBC.
+      </li>
+      <li>
+        <b>Data is end-of-day, not real-time.</b> Don't try to make intraday decisions from
+        this dashboard — the data isn't fresh enough.
+      </li>
+    </ul>
+
+    <p>
+      If a signal on this dashboard contradicts what you're seeing on Morningstar or hearing
+      from other sources, trust the deeper source. This is a scanning tool. It's meant to
+      point you toward things worth investigating, not to substitute for the investigation
+      itself.
+    </p>
+
+    <p style="margin-top:32px; font-size:13px; color:#64748b; text-align:center; border-top:1px solid #e2e8f0; padding-top:16px;">
+      Not investment advice. This dashboard is an internal analytical tool.
+      Do your own research and validate before acting on anything you see here.
+    </p>
+
   </div>
 </div>
 
@@ -885,19 +1442,30 @@ function switchTab(tab) {
   activeTab = tab;
   const tblPanel = document.getElementById('panel-table');
   const zPanel   = document.getElementById('panel-zchart');
+  const gPanel   = document.getElementById('panel-guide');
   const tblBtn   = document.getElementById('tab-btn-table');
   const zBtn     = document.getElementById('tab-btn-zchart');
+  const gBtn     = document.getElementById('tab-btn-guide');
+
+  // Reset all panels/buttons
+  tblPanel.classList.add('hidden');
+  zPanel.classList.add('hidden');
+  gPanel.classList.add('hidden');
+  tblBtn.classList.remove('active');
+  zBtn.classList.remove('active');
+  gBtn.classList.remove('active');
 
   if (tab === 'zchart') {
-    tblPanel.classList.add('hidden');
     zPanel.classList.remove('hidden');
-    tblBtn.classList.remove('active');
     zBtn.classList.add('active');
     loadZChart();
+  } else if (tab === 'guide') {
+    gPanel.classList.remove('hidden');
+    gBtn.classList.add('active');
+    // Scroll guide to top when opening
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   } else {
-    zPanel.classList.add('hidden');
     tblPanel.classList.remove('hidden');
-    zBtn.classList.remove('active');
     tblBtn.classList.add('active');
   }
 }
@@ -909,10 +1477,13 @@ window.addEventListener('beforeprint', function() {
     document.body.classList.add('print-zchart');
     // Force a chart resize so it fits the print viewport
     if (zChartInstance) { try { zChartInstance.resize(); } catch(e){} }
+  } else if (activeTab === 'guide') {
+    document.body.classList.add('print-guide');
   }
 });
 window.addEventListener('afterprint', function() {
   document.body.classList.remove('print-zchart');
+  document.body.classList.remove('print-guide');
   if (zChartInstance) { try { zChartInstance.resize(); } catch(e){} }
 });
 
