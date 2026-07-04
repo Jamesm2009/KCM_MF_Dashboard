@@ -409,15 +409,30 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 .zchart-legend .lg { display: flex; align-items: center; gap: 5px; }
 .lg-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
 .lg-tri { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; }
-.zchart-wrap { position: relative; width: 100%; height: calc(100vh - 260px); min-height: 460px; }
+.zchart-wrap { position: relative; width: 100%; height: calc(100vh - 200px); min-height: 500px; }
 
 /* Hidden helper */
 .hidden { display: none !important; }
 
 /* Print — hide the tab bar and z-chart panel */
+/* Print: honor which tab is active. JS sets a class on <body> before printing. */
 @media print {
-  .tab-bar, #panel-zchart { display: none !important; }
-  #panel-table { display: block !important; }
+  .tab-bar { display: none !important; }
+
+  /* Default (table active): hide z-chart panel */
+  body:not(.print-zchart) #panel-zchart { display: none !important; }
+  body:not(.print-zchart) #panel-table  { display: block !important; }
+
+  /* Z-Score chart active */
+  body.print-zchart #panel-table  { display: none !important; }
+  body.print-zchart #panel-zchart { display: block !important; }
+  body.print-zchart .zchart-wrap {
+    /* Landscape-friendly height so all funds fit on one page */
+    height: 6in !important;
+    min-height: 0 !important;
+    page-break-inside: avoid;
+  }
+  body.print-zchart .print-title { display: block !important; }
 }
 </style>
 </head>
@@ -815,7 +830,10 @@ function toggleCol(cls) {
 
 // ── Tab switching ───────────────────────────────────────────────────────────
 
+let activeTab = 'table';
+
 function switchTab(tab) {
+  activeTab = tab;
   const tblPanel = document.getElementById('panel-table');
   const zPanel   = document.getElementById('panel-zchart');
   const tblBtn   = document.getElementById('tab-btn-table');
@@ -834,6 +852,20 @@ function switchTab(tab) {
     tblBtn.classList.add('active');
   }
 }
+
+// When the user prints (button, Ctrl+P, or system dialog), tag the body so
+// the print stylesheet knows which panel to show.
+window.addEventListener('beforeprint', function() {
+  if (activeTab === 'zchart') {
+    document.body.classList.add('print-zchart');
+    // Force a chart resize so it fits the print viewport
+    if (zChartInstance) { try { zChartInstance.resize(); } catch(e){} }
+  }
+});
+window.addEventListener('afterprint', function() {
+  document.body.classList.remove('print-zchart');
+  if (zChartInstance) { try { zChartInstance.resize(); } catch(e){} }
+});
 
 
 // ── Z-Score Chart ───────────────────────────────────────────────────────────
@@ -1084,16 +1116,7 @@ function renderZChart() {
           min: -0.5,
           max: labels.length - 0.5,
           ticks: {
-            stepSize: 1,
-            color: 'rgba(0,0,0,0.6)',
-            font: { size: 10, weight: '600' },
-            callback: function(v) {
-              const i = Math.round(v);
-              return (i >= 0 && i < labels.length) ? labels[i] : '';
-            },
-            maxRotation: 60,
-            minRotation: 45,
-            autoSkip: false,
+            display: false,
           },
           grid: { color: 'rgba(0,0,0,0.04)' },
           border: { color: 'rgba(0,0,0,0.15)' },
