@@ -402,6 +402,14 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
   color: var(--text); font-size: 13px; font-weight: 600;
   padding: 5px 10px; cursor: pointer;
 }
+.zc-trail-btns { display: flex; gap: 4px; }
+.zc-trail-btn {
+  background: #f8fafc; border: 1px solid var(--border); border-radius: 5px;
+  color: var(--muted); font-size: 12px; font-weight: 600;
+  padding: 5px 10px; cursor: pointer; transition: all .15s;
+}
+.zc-trail-btn:hover { border-color: var(--accent); color: var(--text); }
+.zc-trail-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
 .zchart-legend {
   display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px; color: var(--muted);
   margin-left: auto;
@@ -479,7 +487,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
   
 
 <!-- BADGE CONTAINER - always visible, JS fills in the score -->
-<a href="https://risk-indicator-v4.vercel.app/"
+<a href="https://etf.market-dashboards.com/risk-indicator"
    target="_blank"
    id="risk-badge-link"
    style="text-decoration:none;">
@@ -524,7 +532,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 
 <script>
 (function() {
-  var ETF_API = "https://risk-indicator-v4.vercel.app/";
+  var ETF_API = "https://etf.market-dashboards.com/api/risk-indicator";
 
   function applyRisk(data) {
     if (!data || data.error) return;
@@ -588,7 +596,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 <a class="btn-link1" href="https://regime-tracker.market-dashboards.com/" target="_blank" style="background:#4a5b7e;">Regime</a>
 <a class="btn-link2" href="https://etf.market-dashboards.com/" target="_blank" style="background:#d2e856;">ETFs</a>
 <a class="btn-link3" href="http://www.vixcentral.com/" target="_blank" style="background:#b3daf2;">VIX</a>
-<a class="btn-link4" href="https://docs.google.com/document/d/1WdFdMmLfybhg9tRTFM9_HHv6sqDC1b6x/edit?usp=sharing&ouid=101371495265289212931&rtpof=true&sd=true" target="_blank" style="background:#e3dac9;">Info</a>
+<a class="btn-link4" href="https://docs.google.com/document/d/1m65Pmt6p_4W1oCifimjH9WHenHuWsWxM/edit" target="_blank" style="background:#e3dac9;">Info</a>
 <button class="btn-print" onclick="window.print()">🖨️ Print</button>
   </div>
 </header>
@@ -763,6 +771,12 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
         <option value="balanced">Balanced</option>
       </select>
 
+      <label for="zc-trail" style="margin-left:14px;">Trail:</label>
+      <div class="zc-trail-btns" id="zc-trail-btns">
+        <button class="zc-trail-btn active" data-trail="off" onclick="setTrail('off')">Latest Close</button>
+        <button class="zc-trail-btn"        data-trail="13"  onclick="setTrail('13')">13-Week Trail</button>
+      </div>
+
       <div class="zchart-legend">
         <span class="lg"><span class="lg-dot" style="background:#f97316;"></span>Equity</span>
         <span class="lg"><span class="lg-dot" style="background:#3b82f6;"></span>Bond</span>
@@ -776,7 +790,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
       1-year Z-Score of price. Red band = Overbought (z &gt; +2). Green band = Oversold (z &lt; −2).
       Benchmarks: SPY (US equity), VGK (Intl equity), TLT (long bonds), DBC (commodities). FBNRX also acts as a USD/Intl proxy for the Intl view.
-      <a href="https://www.investopedia.com/terms/z/zscore.asp" target="_blank">Z-Score explained</a>
+      <a href="https://www.investopedia.com/terms/z/zscore.asp" target="_blank" style="color:var(--accent);text-decoration:underline;">Z-Score explained</a>
     </div>
 
     <div class="zchart-wrap">
@@ -873,6 +887,7 @@ window.addEventListener('afterprint', function() {
 
 let zChartData = null;
 let zChartInstance = null;
+let zTrailMode = 'off';   // 'off' | '13' — matches data-trail buttons
 
 // Category → color for fund dots. Kept in-sync with the legend chips above.
 const Z_CAT_COLORS = {
@@ -894,6 +909,38 @@ const Z_FILTER_BENCH = {
   target_date: ['SPY','TLT'],
   balanced:    ['SPY','TLT'],
 };
+
+function setTrail(mode) {
+  zTrailMode = mode;
+  document.querySelectorAll('.zc-trail-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.trail === mode);
+  });
+  renderZChart();
+}
+
+// Helpers to add historical trail dots for a symbol at X-position `xPos`.
+// Returns array of point objects. `color` is used for both dots and line.
+function _trailPointsFor(symbol, xPos, meta) {
+  if (zTrailMode === 'off' || !zChartData || !zChartData.weekly_history) return [];
+  const hist = zChartData.weekly_history[symbol];
+  if (!hist || hist.length === 0) return [];
+  // hist is oldest→newest. Take up to 13 points.
+  const take = hist.slice(-13);
+  return take.map(function(pt, i) {
+    return {
+      x: xPos,
+      y: pt.zscore,
+      _meta: {
+        label:  meta.label,
+        name:   meta.name,
+        zscore: pt.zscore,
+        date:   pt.date,
+        isTrail: true,
+        weeksAgo: take.length - 1 - i,
+      },
+    };
+  });
+}
 
 function loadZChart() {
   if (zChartData) { renderZChart(); return; }
@@ -960,7 +1007,7 @@ function renderZChart() {
     benchPoints.push({
       x: labels.length - 1,
       y: b.zscore,
-      _meta: { label: b.symbol, name: b.name, zscore: b.zscore, isBench: true },
+      _meta: { symbol: b.symbol, label: b.symbol, name: b.name, zscore: b.zscore, isBench: true },
     });
   });
 
@@ -976,6 +1023,12 @@ function renderZChart() {
   }
 
   // 4. Build datasets — one dataset per category so colors are per-dot
+  const trailOn = zTrailMode !== 'off';
+  const currentRadius = trailOn ? 5 : 7;
+  const currentHoverRadius = trailOn ? 7 : 9;
+  const benchRadius = trailOn ? 7 : 9;
+  const benchHoverRadius = trailOn ? 9 : 11;
+
   const catDatasets = {};
   fundPoints.forEach(pt => {
     const cat = pt._meta.chart_category || 'us_equity';
@@ -986,8 +1039,8 @@ function renderZChart() {
         backgroundColor: Z_CAT_COLORS[cat] || '#6b7280',
         borderColor: '#ffffff',
         borderWidth: 1.5,
-        pointRadius: 7,
-        pointHoverRadius: 9,
+        pointRadius: currentRadius,
+        pointHoverRadius: currentHoverRadius,
         pointStyle: 'circle',
         showLine: false,
         datalabels: {
@@ -1004,7 +1057,72 @@ function renderZChart() {
     catDatasets[cat].data.push(pt);
   });
 
-  const datasets = Object.values(catDatasets);
+  const datasets = [];
+
+  // ── Trail datasets (drawn first so they render behind current dots) ──
+  if (trailOn) {
+    // One trail dataset per fund/benchmark, so each gets its own colored line
+    fundPoints.forEach(pt => {
+      const cat = pt._meta.chart_category || 'us_equity';
+      const color = Z_CAT_COLORS[cat] || '#6b7280';
+      const trail = _trailPointsFor(pt._meta.symbol, pt.x, pt._meta);
+      if (trail.length < 2) return;
+      datasets.push({
+        label: pt._meta.symbol + ' trail',
+        data: trail,
+        showLine: true,
+        borderColor: color + '55',        // ~33% opacity — dim connecting line
+        borderWidth: 1.5,
+        backgroundColor: color + '77',    // ~47% opacity dots
+        pointRadius: 2.5,
+        pointHoverRadius: 4,
+        pointStyle: 'circle',
+        pointBorderWidth: 0,
+        datalabels: { display: false },   // no labels on trail dots
+      });
+    });
+    // Trails for benchmarks
+    benchPoints.forEach(pt => {
+      const trail = _trailPointsFor(pt._meta.label, pt.x, pt._meta);
+      if (trail.length < 2) return;
+      datasets.push({
+        label: pt._meta.label + ' trail',
+        data: trail,
+        showLine: true,
+        borderColor: '#dc262655',
+        borderWidth: 1.5,
+        backgroundColor: '#dc262677',
+        pointRadius: 2.5,
+        pointHoverRadius: 4,
+        pointStyle: 'circle',
+        pointBorderWidth: 0,
+        datalabels: { display: false },
+      });
+    });
+    // Trail for extra FBNRX-as-benchmark
+    if (promotedFbnrx) {
+      const xPos = labels.length - 1;
+      const trail = _trailPointsFor('FBNRX', xPos, { label: 'FBNRX', name: promotedFbnrx.name });
+      if (trail.length >= 2) {
+        datasets.push({
+          label: 'FBNRX trail',
+          data: trail,
+          showLine: true,
+          borderColor: '#7c3aed55',
+          borderWidth: 1.5,
+          backgroundColor: '#7c3aed77',
+          pointRadius: 2.5,
+          pointHoverRadius: 4,
+          pointStyle: 'circle',
+          pointBorderWidth: 0,
+          datalabels: { display: false },
+        });
+      }
+    }
+  }
+
+  // Current-day category datasets come next, drawn on top of trails
+  Object.values(catDatasets).forEach(ds => datasets.push(ds));
 
   if (benchPoints.length > 0) {
     datasets.push({
@@ -1013,8 +1131,8 @@ function renderZChart() {
       backgroundColor: '#dc2626',
       borderColor: '#7f1d1d',
       borderWidth: 1.5,
-      pointRadius: 9,
-      pointHoverRadius: 11,
+      pointRadius: benchRadius,
+      pointHoverRadius: benchHoverRadius,
       pointStyle: 'triangle',
       showLine: false,
       datalabels: {
@@ -1035,8 +1153,8 @@ function renderZChart() {
       backgroundColor: '#7c3aed',
       borderColor: '#4c1d95',
       borderWidth: 1.5,
-      pointRadius: 9,
-      pointHoverRadius: 11,
+      pointRadius: benchRadius,
+      pointHoverRadius: benchHoverRadius,
       pointStyle: 'triangle',
       showLine: false,
       datalabels: {
@@ -1052,8 +1170,18 @@ function renderZChart() {
   }
 
   // Compute y-axis bounds. Force ±3 minimum so bands render consistently.
+  // Include trail points so y-axis fits historical range too.
   let yMin = -3, yMax = 3;
-  [...fundPoints, ...benchPoints, ...extraBenchPoints].forEach(p => {
+  const allPointsForBounds = [...fundPoints, ...benchPoints, ...extraBenchPoints];
+  if (trailOn) {
+    // Peek at all trail values to expand y-axis if needed
+    Object.values(zChartData.weekly_history || {}).forEach(function(hist) {
+      (hist || []).slice(-13).forEach(function(pt) {
+        allPointsForBounds.push({ x: 0, y: pt.zscore });
+      });
+    });
+  }
+  allPointsForBounds.forEach(p => {
     if (p.y < yMin) yMin = Math.floor(p.y - 0.3);
     if (p.y > yMax) yMax = Math.ceil(p.y + 0.3);
   });
@@ -1159,6 +1287,9 @@ function renderZChart() {
               const lines = [];
               if (m.name) lines.push(m.name);
               lines.push('Z-Score: ' + m.zscore.toFixed(2));
+              if (m.isTrail && m.date) {
+                lines.push('Week of: ' + m.date);
+              }
               return lines;
             }
           }
