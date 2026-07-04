@@ -11,6 +11,7 @@ import pandas as pd
 import threading
 import time
 import json, os
+import yfinance as yf
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 
@@ -744,6 +745,76 @@ def api_data():
         return jsonify(cache["ranked"])
 
 
+@app.route("/api/price-history/<symbol>")
+def api_price_history(symbol):
+    """Return ~8 months of daily prices for the given symbol.
+
+    Serves the modal chart in the Z-Score view. Fund tickers and benchmark
+    ETFs (SPY/VGK/TLT/DBC) are both supported.
+
+    Data source: yFinance (free, no rate limits at this scale).
+    Cache: Redis key `mf_price_hist_<SYMBOL>` with 1-hour TTL. Redis
+    auto-deletes expired entries — no cleanup job needed. First click
+    triggers a fetch (~1s); subsequent clicks within the hour serve
+    instantly from cache.
+    """
+    symbol = symbol.upper().strip()
+    if not symbol.isalnum() or len(symbol) > 6:
+        return jsonify({"error": "invalid symbol"}), 400
+
+    cache_key = f"mf_price_hist_{symbol}"
+
+    # 1. Try Redis cache first
+    cached = redis_get(cache_key)
+    if cached:
+        return jsonify(cached)
+
+    # 2. Cache miss — fetch from yFinance (~8.5 months = 260 calendar days)
+    try:
+        end_date   = date.today() + timedelta(days=1)   # exclusive; +1 to include today
+        start_date = end_date - timedelta(days=260)
+        df = yf.download(
+            symbol,
+            start=start_date.strftime("%Y-%m-%d"),
+            end=end_date.strftime("%Y-%m-%d"),
+            progress=False,
+            auto_adjust=True,   # adjusts for splits AND distributions consistently
+            threads=False,
+        )
+        if df is None or df.empty:
+            return jsonify({"error": "no data returned from yFinance"}), 404
+
+        # yFinance returns multi-index columns when auto_adjust=True; flatten:
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        closes = df["Close"].dropna()
+        if len(closes) < 5:
+            return jsonify({"error": "insufficient price history"}), 404
+
+        # 3. Look up the fund name (in cache if it's a tracked fund/benchmark)
+        with _lock:
+            row   = cache["data"].get(symbol) or {}
+            bench = cache.get("benchmarks", {}).get(symbol) or {}
+        name = row.get("name") or bench.get("name") or symbol
+
+        result = {
+            "symbol": symbol,
+            "name":   name,
+            "dates":  [d.strftime("%Y-%m-%d") for d in closes.index],
+            "prices": [round(float(v), 2) for v in closes.values],
+        }
+
+        # 4. Save to Redis with 1-hour expiry — Redis auto-cleans up
+        redis_set(cache_key, result, ex_seconds=3600)
+
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"  price-history error for {symbol}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/zscores")
 def api_zscores():
     """Data for the Z-Score Chart tab: funds + benchmarks + weekly history."""
@@ -773,4 +844,3 @@ def api_zscores():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
-
