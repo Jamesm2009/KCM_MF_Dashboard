@@ -419,6 +419,57 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 .lg-tri { width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; }
 .zchart-wrap { position: relative; width: 100%; height: calc(100vh - 200px); min-height: 500px; }
 
+/* ── Price History Modal ─────────────────────────────────────────────── */
+.price-modal {
+  position: fixed; inset: 0;
+  background: rgba(15, 23, 42, 0.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+.price-modal.hidden { display: none; }
+.price-modal-box {
+  background: #fff;
+  border-radius: 10px;
+  width: 100%; max-width: 800px;
+  max-height: 88vh;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  display: flex; flex-direction: column;
+  animation: pm-in 0.15s ease-out;
+}
+@keyframes pm-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.price-modal-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.price-modal-ticker {
+  font-family: 'Courier New', monospace;
+  font-size: 20px; font-weight: 700; color: var(--accent);
+  letter-spacing: 0.5px;
+}
+.price-modal-name {
+  font-size: 13px; color: var(--muted); margin-top: 2px;
+}
+.price-modal-close {
+  background: none; border: none;
+  font-size: 26px; line-height: 1; color: var(--muted);
+  cursor: pointer; padding: 0 4px;
+}
+.price-modal-close:hover { color: var(--text); }
+.price-modal-body { padding: 16px 20px 20px; }
+.price-modal-chart-wrap {
+  position: relative; width: 100%;
+  height: min(52vh, 420px); min-height: 280px;
+}
+.price-modal-note {
+  font-size: 11px; color: var(--muted);
+  margin-top: 10px; line-height: 1.5;
+}
+
 /* Hidden helper */
 .hidden { display: none !important; }
 
@@ -746,6 +797,34 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 
     <div class="zchart-wrap">
       <canvas id="zscoreChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ── PRICE HISTORY MODAL ──────────────────────────────────────────────────
+     Opens when the user clicks the current-day dot for any fund or benchmark
+     on the Z-Score chart. Shows ~8 months of daily prices as an auto-fitted
+     line chart. Trail dots (historical Z-score points) are NOT clickable.
+     Close: X button, click outside, or Escape key.
+     ────────────────────────────────────────────────────────────────────── -->
+<div id="price-modal" class="price-modal hidden" onclick="closePriceModal(event)">
+  <div class="price-modal-box" onclick="event.stopPropagation()">
+    <div class="price-modal-header">
+      <div>
+        <div class="price-modal-ticker" id="pm-ticker">—</div>
+        <div class="price-modal-name" id="pm-name">Loading…</div>
+      </div>
+      <button class="price-modal-close" onclick="closePriceModal()" aria-label="Close">×</button>
+    </div>
+    <div class="price-modal-body">
+      <div class="price-modal-chart-wrap">
+        <canvas id="priceModalChart"></canvas>
+      </div>
+      <div class="price-modal-note">
+        Actual daily adjusted close prices over the last ~8 months, auto-scaled to fit.
+        Sharp step-downs typically reflect fund distributions
+        (bond funds distribute monthly; equity/commodity funds annually, often in December).
+      </div>
     </div>
   </div>
 </div>
@@ -1190,6 +1269,16 @@ function renderZChart() {
       maintainAspectRatio: false,
       animation: { duration: 300 },
       layout: { padding: { top: 20, right: 30, bottom: 30, left: 20 } },
+      onClick: handleZChartClick,
+      onHover: function(event, elements) {
+        // Show pointer cursor over clickable (non-trail) dots
+        var canvas = event.native ? event.native.target : event.chart.canvas;
+        var clickable = elements.some(function(el) {
+          var meta = el.element.$context.raw && el.element.$context.raw._meta;
+          return meta && !meta.isTrail;
+        });
+        canvas.style.cursor = clickable ? 'pointer' : 'default';
+      },
       scales: {
         x: {
           type: 'linear',
@@ -1240,6 +1329,8 @@ function renderZChart() {
               lines.push('Z-Score: ' + m.zscore.toFixed(2));
               if (m.isTrail && m.date) {
                 lines.push('Week of: ' + m.date);
+              } else {
+                lines.push('(click for 8-month price chart)');
               }
               return lines;
             }
@@ -1249,6 +1340,146 @@ function renderZChart() {
     },
   });
 }
+
+
+// ── Price History Modal ─────────────────────────────────────────────────────
+
+let priceModalChart = null;
+
+function handleZChartClick(event, elements) {
+  if (!elements || elements.length === 0) return;
+
+  // Iterate through hit elements — priortize a non-trail (current) dot.
+  // If the user clicked precisely on a trail dot, we ignore per design.
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i];
+    const raw = el.element.$context.raw;
+    if (!raw || !raw._meta) continue;
+    if (raw._meta.isTrail) continue;    // trail dots are non-clickable
+    const symbol = raw._meta.symbol || raw._meta.label;
+    if (!symbol) continue;
+    openPriceModal(symbol, raw._meta);
+    return;
+  }
+}
+
+function openPriceModal(symbol, meta) {
+  const modal = document.getElementById('price-modal');
+  document.getElementById('pm-ticker').textContent = symbol;
+  document.getElementById('pm-name').textContent   = meta.name || 'Loading…';
+  modal.classList.remove('hidden');
+
+  fetch('/api/price-history/' + encodeURIComponent(symbol))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data && data.error) {
+        document.getElementById('pm-name').textContent = 'Error: ' + data.error;
+        return;
+      }
+      if (data && data.name) {
+        document.getElementById('pm-name').textContent = data.name;
+      }
+      renderPriceModalChart(data);
+    })
+    .catch(function(err) {
+      console.error('Price history fetch failed:', err);
+      document.getElementById('pm-name').textContent = 'Failed to load price history.';
+    });
+}
+
+function renderPriceModalChart(data) {
+  const canvas = document.getElementById('priceModalChart');
+  if (!canvas) return;
+
+  if (priceModalChart) { priceModalChart.destroy(); priceModalChart = null; }
+
+  // Thin date labels for readability — show ~8 tick marks max.
+  const dates  = data.dates  || [];
+  const prices = data.prices || [];
+  const step   = Math.max(1, Math.floor(dates.length / 8));
+
+  priceModalChart = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: dates,
+      datasets: [{
+        label:            data.symbol,
+        data:             prices,
+        borderColor:      '#2563eb',
+        backgroundColor:  'rgba(37, 99, 235, 0.08)',
+        borderWidth:      2,
+        pointRadius:      0,
+        pointHoverRadius: 4,
+        tension:          0.1,
+        fill:             true,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 200 },
+      interaction: { mode: 'index', intersect: false },
+      scales: {
+        x: {
+          ticks: {
+            color: 'rgba(0,0,0,0.55)',
+            font: { size: 10 },
+            maxRotation: 0,
+            callback: function(val, idx) {
+              return idx % step === 0 ? dates[idx] : '';
+            },
+          },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          border: { color: 'rgba(0,0,0,0.15)' },
+        },
+        y: {
+          // Auto-fit: no min/max so Chart.js scales to the data range.
+          ticks: {
+            color: 'rgba(0,0,0,0.55)',
+            font: { size: 10 },
+            callback: function(v) { return '$' + v.toFixed(2); },
+          },
+          grid: { color: 'rgba(0,0,0,0.04)' },
+          border: { color: 'rgba(0,0,0,0.15)' },
+        },
+      },
+      plugins: {
+        legend: { display: false },
+        datalabels: { display: false },
+        tooltip: {
+          backgroundColor: '#1e293b',
+          borderColor: '#475569',
+          borderWidth: 1,
+          titleColor: '#f1f5f9',
+          bodyColor:  '#cbd5e1',
+          callbacks: {
+            title: function(items) { return items[0].label; },
+            label: function(ctx) { return '$' + ctx.parsed.y.toFixed(2); },
+          },
+        },
+      },
+    },
+  });
+}
+
+function closePriceModal(event) {
+  // If invoked from the backdrop click, only close when the actual backdrop
+  // was clicked (not a bubbled event from inside the box).
+  if (event && event.target && event.target.id !== 'price-modal' && event.type !== undefined && !event.currentTarget) {
+    return;
+  }
+  const modal = document.getElementById('price-modal');
+  if (modal) modal.classList.add('hidden');
+  if (priceModalChart) { priceModalChart.destroy(); priceModalChart = null; }
+}
+
+// Escape key closes the modal
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') {
+    var modal = document.getElementById('price-modal');
+    if (modal && !modal.classList.contains('hidden')) closePriceModal();
+  }
+});
 </script>
 </body>
 </html>
