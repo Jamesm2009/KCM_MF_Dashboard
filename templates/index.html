@@ -486,10 +486,26 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
   </div>
   
 
-<!-- BADGE CONTAINER - always visible, JS fills in the score -->
-<a href="https://etf.market-dashboards.com/risk-indicator"
+<!-- ── RISK INDICATOR PILL ────────────────────────────────────────────────
+     Powered by the VIX Term Trigger API (risk-indicator-v4.vercel.app).
+     The Flask backend pulls the current signal once per refresh and passes
+     it in via the `vix_trigger` variable. Clicking the pill opens the full
+     dashboard in a new tab.
+     ────────────────────────────────────────────────────────────────────── -->
+{% set _vt   = vix_trigger or {} %}
+{% set _sig  = _vt.get('signal', '—') %}
+{% set _comp = _vt.get('composite') %}
+{% set _clr  = _vt.get('color', '#94a3b8') %}
+{% if _comp is not none %}
+  {% set _score = ('+%.2f' % _comp) if _comp >= 0 else ('%.2f' % _comp) %}
+{% else %}
+  {% set _score = '—' %}
+{% endif %}
+
+<a href="{{ vix_trigger_url }}"
    target="_blank"
    id="risk-badge-link"
+   title="VIX Term Trigger — click for full risk indicator dashboard"
    style="text-decoration:none;">
   <div id="risk-badge" style="
     display: inline-flex;
@@ -497,101 +513,36 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
     gap: 0.55rem;
     padding: 0.38rem 0.85rem 0.38rem 0.6rem;
     border-radius: 6px;
-    background: rgba(255,255,255,0.04);
-    border: 1px solid rgba(255,255,255,0.12);
+    background: {{ _clr }}10;
+    border: 1px solid {{ _clr }}40;
     cursor: pointer;
     transition: background 0.15s, border-color 0.15s;
     white-space: nowrap;
   ">
-    <span id="risk-dot" style="
+    <span style="
       display: inline-block;
       width: 7px; height: 7px;
       border-radius: 50%;
-      background: #4a6070;
+      background: {{ _clr }};
+      box-shadow: 0 0 6px {{ _clr }};
       flex-shrink: 0;
-      transition: background 0.4s, box-shadow 0.4s;
     "></span>
-    <span id="risk-label" style="
+    <span style="
       font-family: monospace;
       font-size: 0.72rem;
       font-weight: 700;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      color: #5a7494;
-      transition: color 0.4s;
-    ">RISK INDICATOR</span>
-    <span id="risk-score" style="
+      color: {{ _clr }};
+    ">{{ _sig }}</span>
+    <span style="
       font-family: monospace;
       font-size: 0.7rem;
-      color: #3a5060;
+      color: {{ _clr }}bb;
       letter-spacing: 0.04em;
-      transition: color 0.4s;
-    ">--</span>
+    ">{{ _score }}</span>
   </div>
 </a>
-
-<script>
-(function() {
-  var ETF_API = "https://etf.market-dashboards.com/api/risk-indicator";
-
-  function applyRisk(data) {
-    if (!data || data.error) return;
-
-    var composite = data.composite;
-    var color     = data.signal_color || "#f59e0b";
-    var label     = data.signal       || "Neutral";
-    var sign      = composite >= 0 ? "+" : "";
-    var score     = sign + composite.toFixed(2);
-
-    var dot   = document.getElementById("risk-dot");
-    var lbl   = document.getElementById("risk-label");
-    var scr   = document.getElementById("risk-score");
-    var badge = document.getElementById("risk-badge");
-
-    if (!dot || !lbl || !scr || !badge) return;
-
-    dot.style.background  = color;
-    dot.style.boxShadow   = "0 0 6px " + color;
-    lbl.style.color       = color;
-    lbl.textContent       = label;
-    scr.style.color       = color + "bb";
-    scr.textContent       = score;
-    badge.style.background    = color + "10";
-    badge.style.borderColor   = color + "40";
-  }
-
-  // Fetch with a short timeout - if ETF dashboard is asleep the badge
-  // just stays in its neutral placeholder state
-  function fetchRisk() {
-    var controller = typeof AbortController !== "undefined" ? new AbortController() : null;
-    var timer;
-    if (controller) {
-      timer = setTimeout(function() { controller.abort(); }, 5000);
-    }
-    var opts = controller ? {signal: controller.signal} : {};
-
-    fetch(ETF_API, opts)
-      .then(function(r) {
-        if (timer) clearTimeout(timer);
-        if (!r.ok) return null;
-        return r.json();
-      })
-      .then(function(data) {
-        if (data) applyRisk(data);
-      })
-      .catch(function() {
-        // Silently fail - badge stays neutral placeholder
-      });
-  }
-
-  // Run immediately on page load
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", fetchRisk);
-  } else {
-    fetchRisk();
-  }
-})();
-</script>
 
 <a class="btn-link1" href="https://regime-tracker.market-dashboards.com/" target="_blank" style="background:#4a5b7e;">Regime</a>
 <a class="btn-link2" href="https://etf.market-dashboards.com/" target="_blank" style="background:#d2e856;">ETFs</a>
