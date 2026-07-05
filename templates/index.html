@@ -69,7 +69,7 @@ header {
 }
 .h-left h1 { font-size: 16px; font-weight: 700; letter-spacing: .3px; }
 .h-left .formula { font-size: 10.5px; color: #93c5fd; margin-top: 2px; }
-.h-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.h-right { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
 .badge { background: rgba(255,255,255,.12); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: #cbd5e1; }
 .badge b { color: #fff; }
@@ -702,72 +702,75 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
     <div class="formula">RS Score = (1D×0.10) + (1W×0.20) + (1M×0.30) + (3M×0.40) &nbsp;|&nbsp; Rank 1 = strongest relative strength</div>
   </div>
   
+  <!-- NEW: wrap the risk pill + buttons in a single group -->
+  <div class="h-right">
+  
+    <!-- ── RISK INDICATOR PILL ────────────────────────────────────────────────
+         Powered by the VIX Term Trigger API (risk-indicator-v4.vercel.app).
+         The Flask backend pulls the current signal once per refresh and passes
+         it in via the `vix_trigger` variable. Clicking the pill opens the full
+         dashboard in a new tab.
+         ────────────────────────────────────────────────────────────────────── -->
+    {% set _vt   = vix_trigger or {} %}
+    {% set _sig  = _vt.get('signal', '—') %}
+    {% set _comp = _vt.get('composite') %}
+    {% set _clr  = _vt.get('color', '#94a3b8') %}
+    {% if _comp is not none %}
+      {% set _score = ('+%.2f' % _comp) if _comp >= 0 else ('%.2f' % _comp) %}
+    {% else %}
+      {% set _score = '—' %}
+    {% endif %}
+    <a href="{{ vix_trigger_url }}"
+       target="_blank"
+       id="risk-badge-link"
+       title="VIX Term Trigger — click for full risk indicator dashboard"
+       style="text-decoration:none;">
+      <div id="risk-badge" style="
+        display: inline-flex;
+        align-items: center;
+        gap: 0.55rem;
+        padding: 0.38rem 0.85rem 0.38rem 0.6rem;
+        border-radius: 6px;
+        background: {{ _clr }}10;
+        border: 1px solid {{ _clr }}40;
+        cursor: pointer;
+        transition: background 0.15s, border-color 0.15s;
+        white-space: nowrap;
+      ">
+        <span style="
+          display: inline-block;
+          width: 7px; height: 7px;
+          border-radius: 50%;
+          background: {{ _clr }};
+          box-shadow: 0 0 6px {{ _clr }};
+          flex-shrink: 0;
+        "></span>
+        <span style="
+          font-family: monospace;
+          font-size: 0.72rem;
+          font-weight: 700;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: {{ _clr }};
+        ">{{ _sig }}</span>
+        <span style="
+          font-family: monospace;
+          font-size: 0.7rem;
+          color: {{ _clr }}bb;
+          letter-spacing: 0.04em;
+        ">{{ _score }}</span>
+      </div>
+    </a>
 
-<!-- ── RISK INDICATOR PILL ────────────────────────────────────────────────
-     Powered by the VIX Term Trigger API (risk-indicator-v4.vercel.app).
-     The Flask backend pulls the current signal once per refresh and passes
-     it in via the `vix_trigger` variable. Clicking the pill opens the full
-     dashboard in a new tab.
-     ────────────────────────────────────────────────────────────────────── -->
-{% set _vt   = vix_trigger or {} %}
-{% set _sig  = _vt.get('signal', '—') %}
-{% set _comp = _vt.get('composite') %}
-{% set _clr  = _vt.get('color', '#94a3b8') %}
-{% if _comp is not none %}
-  {% set _score = ('+%.2f' % _comp) if _comp >= 0 else ('%.2f' % _comp) %}
-{% else %}
-  {% set _score = '—' %}
-{% endif %}
+    <a class="btn-link1" href="https://regime-tracker.market-dashboards.com/" target="_blank">Regime</a>
+    <a class="btn-link2" href="http://macro.market-dashboards.com" target="_blank">Macro</a>
+    <a class="btn-link3" href="http://www.vixcentral.com/" target="_blank">VIX</a>
+    <a class="btn-link4" href="https://etf.market-dashboards.com/" target="_blank">ETFs</a>
+    <a class="btn-link5" href="https://docs.google.com/document/d/1m65Pmt6p_4W1oCifimjH9WHenHuWsWxM/edit" target="_blank">Info</a>
+    <button class="btn-print" onclick="window.print()">🖨️ Print</button>
 
-<a href="{{ vix_trigger_url }}"
-   target="_blank"
-   id="risk-badge-link"
-   title="VIX Term Trigger — click for full risk indicator dashboard"
-   style="text-decoration:none;">
-  <div id="risk-badge" style="
-    display: inline-flex;
-    align-items: center;
-    gap: 0.55rem;
-    padding: 0.38rem 0.85rem 0.38rem 0.6rem;
-    border-radius: 6px;
-    background: {{ _clr }}10;
-    border: 1px solid {{ _clr }}40;
-    cursor: pointer;
-    transition: background 0.15s, border-color 0.15s;
-    white-space: nowrap;
-  ">
-    <span style="
-      display: inline-block;
-      width: 7px; height: 7px;
-      border-radius: 50%;
-      background: {{ _clr }};
-      box-shadow: 0 0 6px {{ _clr }};
-      flex-shrink: 0;
-    "></span>
-    <span style="
-      font-family: monospace;
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: {{ _clr }};
-    ">{{ _sig }}</span>
-    <span style="
-      font-family: monospace;
-      font-size: 0.7rem;
-      color: {{ _clr }}bb;
-      letter-spacing: 0.04em;
-    ">{{ _score }}</span>
   </div>
-</a>
-
-<a class="btn-link1" href="https://regime-tracker.market-dashboards.com/" target="_blank" style="background:#98A6C3;">Regime</a>
-<a class="btn-link2" href="http://macro.market-dashboards.com" target="_blank" style="background:#B3811E;">Macro</a>
-<a class="btn-link3" href="http://www.vixcentral.com/" target="_blank" style="background:#b3daf2;">VIX</a>
-<a class="btn-link4" href="https://etf.market-dashboards.com/" target="_blank" style="background:#E87856;">ETFs</a>
-<a class="btn-link5" href="https://docs.google.com/document/d/1m65Pmt6p_4W1oCifimjH9WHenHuWsWxM/edit" target="_blank" style="background:#e3dac9;">Info</a>
-<button class="btn-print" onclick="window.print()">🖨️ Print</button>
-  </div>
+  <!-- END new h-right wrapper -->
 </header>
 
 <!-- ── Tab bar ── -->
