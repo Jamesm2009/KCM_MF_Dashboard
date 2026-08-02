@@ -38,7 +38,7 @@ VIX_TRIGGER_LINK_URL  = "https://risk-indicator-v4.vercel.app/"
 BENCHMARKS = [
     {"symbol": "SPY", "name": "S&P 500 ETF",           "role": "us_equity"},
     {"symbol": "VGK", "name": "FTSE Europe ETF",       "role": "intl_equity"},
-    {"symbol": "TLT", "name": "20+ Yr Treasury ETF",   "role": "bonds"},
+    {"symbol": "IEF", "name": "7-10 Yr Treasury ETF",  "role": "bonds"},
     {"symbol": "DBC", "name": "Broad Commodity ETF",   "role": "commodity"},
 ]
 
@@ -718,10 +718,12 @@ def refresh():
     """Force a full fresh download — use once daily after market close."""
     redis_del(REDIS_KEY_MF)
     redis_del(REDIS_KEY_PRG)
+    redis_del(REDIS_KEY_HIST)
     with _lock:
-        cache["data"]   = {}
-        cache["ranked"] = []
-        cache["phase"]  = 0
+        cache["data"]           = {}
+        cache["ranked"]         = []
+        cache["phase"]          = 0
+        cache["weekly_history"] = {}
     trigger_update()
     return jsonify({"status": "full refresh started — check /status for progress"})
 
@@ -750,7 +752,7 @@ def api_price_history(symbol):
     """Return ~8 months of daily prices for the given symbol.
 
     Serves the modal chart in the Z-Score view. Fund tickers and benchmark
-    ETFs (SPY/VGK/TLT/DBC) are both supported.
+    ETFs (SPY/VGK/IEF/DBC) are both supported.
 
     Data source: yFinance (free, no rate limits at this scale).
     Cache: Redis key `mf_price_hist_<SYMBOL>` with 1-hour TTL. Redis
