@@ -980,7 +980,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
 
     <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">
       1-year Z-Score of price. Red band = Overbought (z &gt; +2). Green band = Oversold (z &lt; −2).
-      Benchmarks: SPY (US equity), VGK (Intl equity), TLT (long bonds), DBC (commodities). FBNRX also acts as a USD/Intl proxy for the Intl view.
+      Benchmarks: SPY (US equity), VGK (Intl equity), IEF (intermediate bonds), DBC (commodities). FBNRX also acts as a USD/Intl proxy for the Intl view.
       <a href="https://www.investopedia.com/terms/z/zscore.asp" target="_blank" style="color:var(--accent);text-decoration:underline;">Z-Score explained</a>
       &nbsp;·&nbsp;
       <span style="color:var(--accent);">💡 Click any current-day dot to see an 8-month price chart</span>
@@ -1276,7 +1276,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
     <ul>
       <li><b>SPY</b> — US equity benchmark</li>
       <li><b>VGK</b> — international equity benchmark</li>
-      <li><b>TLT</b> — long duration bond benchmark</li>
+      <li><b>IEF</b> — intermediate-term Treasury benchmark</li>
       <li><b>DBC</b> — broad commodity benchmark</li>
       <li><b>FBNRX</b> — appears as a purple triangle in the International view as a USD proxy</li>
     </ul>
@@ -1395,7 +1395,7 @@ footer { text-align: center; padding: 16px; color: var(--muted); font-size: 11px
         genuinely hard — Morningstar spends significant effort building category-specific
         benchmarks for exactly this reason. Rather than picking a rough benchmark that
         might mislead, the modal shows only the fund's own price. The Z-Score Chart already
-        gives you relative-to-market context via SPY, VGK, TLT, DBC.
+        gives you relative-to-market context via SPY, VGK, IEF, DBC.
       </li>
       <li>
         <b>Data is end-of-day, not real-time.</b> Don't try to make intraday decisions from
@@ -1534,13 +1534,13 @@ const Z_CAT_COLORS = {
 
 // Which benchmarks show for each view filter.
 const Z_FILTER_BENCH = {
-  all:         ['SPY','VGK','TLT','DBC'],
+  all:         ['SPY','VGK','IEF','DBC'],
   us_equity:   ['SPY'],
   intl_equity: ['VGK','FBNRX'],   // FBNRX included as USD/Intl proxy
-  bond:        ['TLT'],
-  commodity:   ['SPY','TLT','DBC'],
-  target_date: ['SPY','TLT'],
-  balanced:    ['SPY','TLT'],
+  bond:        ['IEF'],
+  commodity:   ['SPY','IEF','DBC'],
+  target_date: ['SPY','IEF'],
+  balanced:    ['SPY','IEF'],
 };
 
 function setTrail(mode) {
