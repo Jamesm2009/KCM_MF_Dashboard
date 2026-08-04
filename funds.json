@@ -15,9 +15,9 @@
     "morningstar_url": "https://www.morningstar.com/funds/xnas/JLGMX/portfolio" },
   { "symbol": "JSVUX",  "name": "JPMorgan Small Cap Value",          "type": "EQUITY - Small Cap Value US",      "category": "equity",      "ttm_yield": 0.75,
     "morningstar_url": "https://www.morningstar.com/funds/xnas/JSVUX/portfolio" },
-  { "symbol": "MCZZX",  "name": "MML Barings Core Bond I",           "type": "BONDS - Intermediate Core",        "category": "bond",        "ttm_yield": 4.17,
+  { "symbol": "MCZZX",  "name": "MML Barings Core Bond I",           "type": "BONDS - Intermediate Core",        "category": "bond",        "ttm_yield": 4.57,
     "morningstar_url": "https://www.morningstar.com/funds/xnas/MCZZX/portfolio" },
-  { "symbol": "MPHZX",  "name": "MassMutual High Yield",             "type": "BONDS - Corporate",                "category": "bond",        "ttm_yield": 6.26,
+  { "symbol": "MPHZX",  "name": "MassMutual High Yield",             "type": "BONDS - Corporate",                "category": "bond",        "ttm_yield": 6.86,
     "morningstar_url": "https://www.morningstar.com/funds/xnas/MPHZX/portfolio" },
   { "symbol": "NOBOX",  "name": "Northern Bond Index Fund",          "type": "BONDS - Intermediate Term",        "category": "bond",        "ttm_yield": 4.02,
     "morningstar_url": "https://www.morningstar.com/funds/xnas/NOBOX/portfolio" },
@@ -65,8 +65,8 @@
     "morningstar_url": "https://www.morningstar.com/funds/xnas/VIMAX/portfolio" },
   { "symbol": "VMVAX",  "name": "Vanguard Mid-Cap Value Index",      "type": "EQUITY - Mid Cap Value US",        "category": "equity",      "ttm_yield": 1.88,
     "morningstar_url": "https://www.morningstar.com/funds/xnas/VMVAX/portfolio" },
-  { "symbol": "VSMAX",  "name": "Vanguard Small-Cap Index",          "type": "EQUITY - Small Cap Index US",      "category": "equity",      "ttm_yield": 1.1,
+  { "symbol": "VSMAX",  "name": "Vanguard Small-Cap Index",          "type": "EQUITY - Small Cap Index US",      "category": "equity",      "ttm_yield": 1.18,
     "morningstar_url": "https://www.morningstar.com/funds/xnas/VSMAX/portfolio" },
-  { "symbol": "VTIAX",  "name": "Vanguard Total Intl Stock",         "type": "EQUITY INTL - Large Cap Core",     "category": "equity",      "ttm_yield": 2.563,
+  { "symbol": "VTIAX",  "name": "Vanguard Total Intl Stock",         "type": "EQUITY INTL - Large Cap Core",     "category": "equity",      "ttm_yield": 2.53,
     "morningstar_url": "https://www.morningstar.com/funds/xnas/VTIAX/portfolio" }
 ]
