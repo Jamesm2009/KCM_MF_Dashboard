@@ -749,7 +749,7 @@ def api_data():
 
 @app.route("/api/price-history/<symbol>")
 def api_price_history(symbol):
-    """Return ~8 months of daily prices for the given symbol.
+    """Return ~3 years of weekly prices for the given symbol.
 
     Serves the modal chart in the Z-Score view. Fund tickers and benchmark
     ETFs (SPY/VGK/IEF/DBC) are both supported.
@@ -774,7 +774,7 @@ def api_price_history(symbol):
     # 2. Cache miss — fetch from yFinance (~8.5 months = 260 calendar days)
     try:
         end_date   = date.today() + timedelta(days=1)   # exclusive; +1 to include today
-        start_date = end_date - timedelta(days=260)
+        start_date = end_date - timedelta(days=1100)    # ~3 years + buffer
         df = yf.download(
             symbol,
             start=start_date.strftime("%Y-%m-%d"),
